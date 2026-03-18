@@ -5,22 +5,23 @@ import asyncio
 import re
 import random
 import os
-
-# ── TOKEN ────────────────────────────────────────────────────────────────────
+ 
+# ── TOKEN & CONFIG ───────────────────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-GUILD_ID = 1225611222074921091  # Replace with your actual server ID
+GUILD_ID =  1225611222074921091 # Replace with your actual server ID
+ 
+MAX_MESSAGES = 40_000  # Maximum messages to scan
+BATCH_SIZE = 100        # Discord's max per request
+BATCH_DELAY = 0.75      # Delay between batches — tuned to avoid rate limits at scale
+PROGRESS_EVERY = 1000   # Update the progress message every N messages
 # ────────────────────────────────────────────────────────────────────────────
-
-MAX_MESSAGES = 40_000
-BATCH_SIZE = 100
-BATCH_DELAY = 0.5
-
+ 
 intents = discord.Intents.default()
 intents.message_content = True
-
+ 
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-
+ 
+ 
 # ── KILL FEED RESPONSES ──────────────────────────────────────────────────────
 KILL_RESPONSES = [
     'RIP "{name}" BOZO, NEW PACK 🚬',
@@ -34,8 +35,8 @@ KILL_RESPONSES = [
     'F in chat for "{name}" 🚬 NEW PACK',
     '"{name}" got their base wiped AND their life taken. Rough day. NEW PACK 🚬',
 ]
-
-# ── WOCK AD RESPONSES ────────────────────────────────────────────────────────
+ 
+# ── WOCK ADS ─────────────────────────────────────────────────────────────────
 WOCK_ADS = [
     "{mention} you look stressed. Have you tried **Wock**? The official cough syrup of Alphaclash. Available at your nearest drop crate. 🚬",
     "{mention} your Wock subscription is ready for pickup. Bring the Wock to Alphaclash. 🚬",
@@ -48,78 +49,32 @@ WOCK_ADS = [
     "Dear {mention}, the tribe has voted. You need **Wock**. Immediately. 🚬",
     "{mention} one sip of **Wock** and your tames will never die again. Probably. NEW PACK 🚬",
 ]
-
-
+ 
+ 
 # ── KILL MESSAGE LISTENER ────────────────────────────────────────────────────
 @bot.event
 async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
-
+ 
     match = re.search(r'Your Tribe killed ([^\s!.,\n]+)', message.content, re.IGNORECASE)
     if match:
         player_name = match.group(1)
         response = random.choice(KILL_RESPONSES).format(name=player_name)
         await message.channel.send(response)
-
+ 
     await bot.process_commands(message)
-
-
-# ── SLASH COMMAND: /wock ─────────────────────────────────────────────────────
-@bot.tree.command(name="wock", description="Prescribe someone their daily Wock.")
-@app_commands.describe(player="The person who needs their Wock")
-async def wock(interaction: discord.Interaction, player: discord.Member):
-    ad = random.choice(WOCK_ADS).format(mention=player.mention)
-    await interaction.response.send_message(ad)
-
-
-# ── SLASH COMMAND: /count ────────────────────────────────────────────────────
-@bot.tree.command(name="count", description="Count how many times a word or phrase appears in this channel.")
-@app_commands.describe(
-    phrase="The word or phrase to search for",
-    case_sensitive="Case-sensitive search? (default: No)"
-)
-async def count(interaction: discord.Interaction, phrase: str, case_sensitive: bool = False):
-    await interaction.response.defer(thinking=True)
-
-    channel = interaction.channel
-    search = phrase if case_sensitive else phrase.lower()
-
-    progress = await interaction.followup.send(f"⏳ Scanning `#{channel.name}` for `{phrase}`... this may take a moment for large channels.")
-
-    try:
-        messages = await safe_history(channel, MAX_MESSAGES)
-    except discord.Forbidden:
-        await progress.edit(content="❌ I don't have permission to read message history here.")
-        return
-    except discord.HTTPException as e:
-        await progress.edit(content=f"❌ Discord API error: {e}")
-        return
-
-    count_total = 0
-    for msg in messages:
-        content = msg.content if case_sensitive else msg.content.lower()
-        count_total += content.count(search)
-
-    embed = discord.Embed(title="🔍 WockCounter Results", color=0x00bfff)
-    embed.add_field(name="Phrase", value=f"`{phrase}`", inline=True)
-    embed.add_field(name="Occurrences", value=f"**{count_total}**", inline=True)
-    embed.add_field(name="Messages Scanned", value=f"{len(messages):,}", inline=True)
-    embed.add_field(name="Channel", value=channel.mention, inline=True)
-    embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
-
-    await progress.edit(content=None, embed=embed)
-
-
-# ── RATE LIMIT SAFE HISTORY FETCHER ─────────────────────────────────────────
-async def safe_history(channel, limit):
+ 
+ 
+# ── RATE LIMIT SAFE HISTORY FETCHER WITH LIVE PROGRESS ──────────────────────
+async def safe_history(channel, limit, progress_msg=None):
     messages = []
     last_message_id = None
     remaining = limit
-
+ 
     while remaining > 0:
         fetch_size = min(BATCH_SIZE, remaining)
-
+ 
         for attempt in range(5):
             try:
                 kwargs = {"limit": fetch_size}
@@ -130,25 +85,80 @@ async def safe_history(channel, limit):
             except discord.HTTPException as e:
                 if e.status == 429:
                     retry_after = float(e.response.headers.get("Retry-After", 5))
-                    print(f"⚠️  Rate limited — waiting {retry_after}s before retrying...")
+                    print(f"⚠️  Rate limited — waiting {retry_after}s...")
+                    if progress_msg:
+                        await progress_msg.edit(content=f"⏳ Rate limited by Discord — waiting {retry_after:.0f}s then resuming... ({len(messages):,} messages scanned so far)")
                     await asyncio.sleep(retry_after + 1)
                 else:
                     raise
         else:
-            print("❌ Gave up after 5 rate limit retries.")
+            print("❌ Gave up after 5 retries.")
             break
-
+ 
         if not batch:
             break
-
+ 
         messages.extend(batch)
         last_message_id = batch[-1].id
         remaining -= len(batch)
+ 
+        # Update progress message every PROGRESS_EVERY messages
+        if progress_msg and len(messages) % PROGRESS_EVERY < BATCH_SIZE:
+            await progress_msg.edit(content=f"⏳ Scanning... **{len(messages):,}** messages scanned so far (target: {limit:,})")
+ 
         await asyncio.sleep(BATCH_DELAY)
-
+ 
     return messages
-
-
+ 
+ 
+# ── SLASH COMMAND: /count ────────────────────────────────────────────────────
+@bot.tree.command(name="count", description="Count how many times a word or phrase appears in this channel.")
+@app_commands.describe(
+    phrase="The word or phrase to search for",
+    limit="How many messages to scan (default: 40000, max: 40000)",
+    case_sensitive="Case-sensitive search? (default: No)"
+)
+async def count(interaction: discord.Interaction, phrase: str, limit: int = MAX_MESSAGES, case_sensitive: bool = False):
+    await interaction.response.defer(thinking=True)
+ 
+    limit = min(limit, MAX_MESSAGES)  # Cap at max
+    channel = interaction.channel
+    search = phrase if case_sensitive else phrase.lower()
+ 
+    progress = await interaction.followup.send(f"⏳ Starting scan of `#{channel.name}` for `{phrase}`... (0 messages scanned)")
+ 
+    try:
+        messages = await safe_history(channel, limit, progress_msg=progress)
+    except discord.Forbidden:
+        await progress.edit(content="❌ I don't have permission to read message history here.")
+        return
+    except discord.HTTPException as e:
+        await progress.edit(content=f"❌ Discord API error: {e}")
+        return
+ 
+    count_total = 0
+    for msg in messages:
+        content = msg.content if case_sensitive else msg.content.lower()
+        count_total += content.count(search)
+ 
+    embed = discord.Embed(title="🔍 WockCounter Results", color=0x00bfff)
+    embed.add_field(name="Phrase", value=f"`{phrase}`", inline=True)
+    embed.add_field(name="Occurrences", value=f"**{count_total}**", inline=True)
+    embed.add_field(name="Messages Scanned", value=f"{len(messages):,}", inline=True)
+    embed.add_field(name="Channel", value=channel.mention, inline=True)
+    embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
+ 
+    await progress.edit(content=None, embed=embed)
+ 
+ 
+# ── SLASH COMMAND: /wock ─────────────────────────────────────────────────────
+@bot.tree.command(name="wock", description="Prescribe someone their daily Wock.")
+@app_commands.describe(player="The person who needs their Wock")
+async def wock(interaction: discord.Interaction, player: discord.Member):
+    ad = random.choice(WOCK_ADS).format(mention=player.mention)
+    await interaction.response.send_message(ad)
+ 
+ 
 # ── STARTUP ──────────────────────────────────────────────────────────────────
 @bot.event
 async def on_ready():
@@ -160,7 +170,6 @@ async def on_ready():
         print(f"✅ Synced {len(synced)} command(s)")
     except Exception as e:
         print(f"❌ Sync failed: {e}")
-
-
+ 
+ 
 bot.run(BOT_TOKEN)
-
