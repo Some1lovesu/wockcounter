@@ -8,6 +8,7 @@ import os
 
 # ── TOKEN ────────────────────────────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
+GUILD_ID = 1225611222074921091  # Replace with your actual server ID
 # ────────────────────────────────────────────────────────────────────────────
 
 MAX_MESSAGES = 10_000
@@ -153,7 +154,9 @@ async def safe_history(channel, limit):
 async def on_ready():
     print(f"✅ WockCounter is online as {bot.user}")
     try:
-        synced = await bot.tree.sync()
+        guild = discord.Object(id=GUILD_ID)
+        bot.tree.copy_global_to(guild=guild)
+        synced = await bot.tree.sync(guild=guild)
         print(f"✅ Synced {len(synced)} command(s)")
     except Exception as e:
         print(f"❌ Sync failed: {e}")
