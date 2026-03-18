@@ -11,7 +11,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 GUILD_ID = 1225611222074921091  # Replace with your actual server ID
 # ────────────────────────────────────────────────────────────────────────────
 
-MAX_MESSAGES = 10_000
+MAX_MESSAGES = 40_000
 BATCH_SIZE = 100
 BATCH_DELAY = 0.5
 
