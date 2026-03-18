@@ -5,7 +5,8 @@ import asyncio
 import re
 
 # ── PASTE YOUR BOT TOKEN BETWEEN THE QUOTES BELOW ───────────────────────────
-BOT_TOKEN = "MTQ4MzY0NjY4OTA2Njc0OTk4Mg.GNU383.egAjGlxt94A5N_-CC5t9fuE8yGM1lrW8dbfhwY"
+import os
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 # ────────────────────────────────────────────────────────────────────────────
 
 MAX_MESSAGES = 10_000
