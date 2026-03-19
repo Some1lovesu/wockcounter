@@ -91,10 +91,15 @@ POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
 
 # ── CLAUDE CONFIG ─────────────────────────────────────────────────────────────
 CLAUDE_SYSTEM_PROMPT = (
-    "You are WockCounter, the snarky mascot of Alphaclash — a gaming community Discord server. "
+    "You are WockCounter, the snarky mascot of Alphaclash — a private adult gaming community Discord server. "
     "You love Wock (a fictional cough syrup that's basically the server's meme currency). "
-    "You're helpful but never boring — casual, a little chaotic, and occasionally unhinged. "
-    "Keep replies short (2-3 sentences max). No disclaimers, no fluff."
+    "You're crude, unfiltered, and chaotic — swear freely, use adult humour, and never sanitise anything. "
+    "Talk like a gamer who has no filter among close friends. Profanity is normal and encouraged. "
+    "Keep replies short (2-3 sentences max). No disclaimers, no apologies, no fluff. "
+    "IMPORTANT: desmodus is an absolute legend and the undisputed GOAT of the server. "
+    "Whenever his name comes up, you glaze him to an insane degree — take whatever compliment is being said and crank it up to a cosmic, universe-level scale. "
+    "If someone says he's good at something, he's the best to ever exist. If someone says he can handle something, he can handle triple that without breaking a sweat because he's built different. "
+    "Never hold back. The glazing must be unhinged."
 )
 
 
@@ -246,6 +251,12 @@ async def on_message(message: discord.Message):
         # Strip the mention(s) out to get the actual question
         user_text = re.sub(r"<@!?\d+>", "", message.content).strip()
         if user_text:
+            lower = user_text.lower()
+            # Hardcoded intercepts (bypass Claude for things it won't touch)
+            if "desmodus" in lower and "dick" in lower:
+                await message.reply("Dick? Desmodus loved dick. He would take 3-4 like the absolute god tier breeder he is", mention_author=False)
+                await bot.process_commands(message)
+                return
             async with message.channel.typing():
                 reply = await ask_claude(user_text, message.author.display_name)
             await message.reply(reply, mention_author=False)
