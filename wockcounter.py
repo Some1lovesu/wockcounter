@@ -102,6 +102,167 @@ CLAUDE_SYSTEM_PROMPT = (
     "Never hold back. The glazing must be unhinged."
 )
 
+# ── ARK: SURVIVAL ASCENDED KNOWLEDGE BASE ─────────────────────────────────────
+ARK_KNOWLEDGE = """
+ARK: Survival Ascended (ASA) Knowledge Base — use this to answer questions accurately.
+
+## OVERVIEW
+ARK: Survival Ascended is the Unreal Engine 5 remaster of ARK: Survival Evolved. Released Oct 2023.
+Maps released so far: The Island (launch), Scorched Earth, Aberration, The Center, Extinction (roadmap).
+Cross-platform mod support via CurseForge. Runs on PC, Xbox Series X/S, PS5.
+
+## CORE STATS (every player and dino has these)
+- Health (HP): how much damage you can take before death
+- Stamina: drains when sprinting/attacking; regens when idle
+- Oxygen: breath underwater; also affects swim speed
+- Food & Water: must stay above 0 or you take damage
+- Weight: carry limit; over-weight = can't move
+- Melee Damage: affects damage dealt and resource gathering yield
+- Movement Speed: how fast you move (player only — dinos cannot level this on official)
+- Crafting Skill: reduces crafting time, improves quality of crafted blueprints
+- Fortitude: resistance to temperature, torpor, and status effects
+
+## TAMING
+Two main methods:
+1. KNOCKOUT TAMING — knock a dino unconscious with tranq arrows, crossbow + tranq arrows, longneck + tranq darts, or a wooden club. Keep it unconscious with narcotics or biotoxin. Feed it the preferred food (see below).
+2. PASSIVE TAMING — walk up with food in last inventory slot, no violence needed. Examples: Equus (kibble/rockarrot), Ichthyornis (fish), Giant Bee (rare flowers), Hesperornis (fish).
+
+Taming effectiveness: higher effectiveness = more bonus levels on tame. Never let torpor hit 0 or food run out mid-tame.
+
+Preferred foods (highest effectiveness first, general rules):
+- Kibble (higher-tier = better for stronger dinos)
+- Crops / vegetables for herbivores
+- Raw mutton / raw prime meat for carnivores
+- Raw meat as fallback for carnivores
+
+Kibble tiers: Basic → Simple → Regular → Superior → Exceptional → Ascendant
+
+## KEY CREATURES & USES
+- Rex: top land combat/boss fighter; needs Rex saddle
+- Giga: highest land DPS, dangerous if enraged; hard to tame
+- Quetzal: flying platform dino; great for resource runs
+- Argentavis (Argy): flying workhorse; can carry smaller dinos; great weight
+- Pteranodon: fast scout flyer; low weight cap
+- Wyvern (Scorched Earth/Ragnarok): fire/lightning/poison/ice; raised not tamed from eggs
+- Griffin: fast flyer; dive-bomb attack; solo mount only
+- Ankylosaurus (Anky): best metal and crystal harvester
+- Doedicurus (Doed): best stone harvester
+- Beaver (Castoroides): generates wood passively in inventory; great for wood/thatch
+- Therizinosaurus (Theriz): versatile harvester (fiber, berries, rare flowers/mushrooms); boss fighter
+- Megatherium: insect bonus damage; great for Broodmother fight
+- Bronto: best berry gatherer (large saddle platform)
+- Trike: good berry/fiber gatherer; early game tame
+- Moschops: passive; great early-game for rare resources (chitin, oil, rare flowers)
+- Pelagornis: can land/walk on water; great for fishing/ocean travel
+- Basilosaurus: ocean tank; no oxygen drain; produces oil and organic polymer passively
+- Manta: fast ocean mount
+- Mosasaur: large ocean combat mount
+- Plesiosaur (Plesi): ocean platform saddle
+- Beelzebufo (Frog): excellent cementing paste farmer from insects
+- Carbonemys (Turtle): great early tank with high armor saddle
+- Pulmonoscorpius (Scorpion): torpor attacks; useful for taming other dinos
+- Procoptodon (Kanga): carries babies/small dinos; high jump
+- Snow Owl: heals nearby dinos when hovering; can freeze targets
+- Deinonychus: pack hunter; bleeds targets
+- Shadowmane: stealth ambush predator; passive tame with fish
+- Fjordhawk: scavenger; pick up your own inventory on death (Fjordur)
+- Noglin: mind-control mechanic; attaches to heads
+- Maewing: nursemaid; nurses babies and passively feeds them
+- Astrodelphis (Space Dolphin): high-speed flyer; tek saddle with weapons
+- Stryder: tek mining/harvesting mech (Extinction)
+- Gacha: random loot drops (Extinction)
+- Reaper King: underground ambush predator (Aberration)
+- Rock Drake: glide + wall-climb; camouflage (Aberration)
+- Ravager: pack predator; climbs zip lines (Aberration)
+
+## RESOURCES & GATHERING
+- Metal: mined from dark rocks; smelt in forge/industrial forge (Anky is best)
+- Crystal: clear nodes (Anky); needed for fabricator, electronics
+- Obsidian: black nodes on mountains; needed for polymer, electronics (Anky)
+- Silica Pearls: ocean floor; needed for electronics
+- Oil: underwater rocks or Basilosaurus/Dung Beetle passive (also pump on Scorched Earth)
+- Polymer: obsidian + cementing paste in fabricator; or organic polymer from Kairuku/Mantis
+- Cementing Paste: beaver dams, Beelzebufo farming bugs, or mortar+pestle (chitin/keratin + stone)
+- Fiber: harvested by hand or Theriz/Moschops/Trike
+- Chitin/Keratin: from insects and reptiles; Megatherium is best
+- Element: from boss fights, OSD/veins (Extinction), Charge Nodes (Aberration), City Terminals
+- Gasoline: oil + hide in chemistry bench/industrial forge; powers generators and industrial machines
+- Electronics: metal ingots + silica pearls in fabricator
+- Narcotic: spoiled meat + narcoberries in mortar/pestle or chemistry bench
+- Bio Toxin: from Cnidaria jellyfish; better than narcotics for torpor
+- Rare Flowers/Mushrooms: harvested by Theriz or in swamps; needed for rockwell recipes & kibble
+
+## BASE BUILDING
+Materials tier (weakest to strongest): Thatch → Wood → Stone → Metal → Tek
+- Thatch: instant, destroyed by almost anything
+- Wood: early progression; damaged by dinos
+- Stone: dino-proof but player-raid-able; good mid-game
+- Metal: raid-resistant; requires grinder/fabricator resources
+- Tek: endgame; requires element; most resistant
+
+Key structures: Foundations, Walls, Ceilings, Doorframes, Ramps, Dinosaur Gates (for large dinos).
+Auto turrets, plant species X, and heavy turrets are common base defenses.
+Turrets require bullets (metal + gunpowder or fabricated sniper ammo etc.).
+
+## BREEDING
+- Breed two compatible dinos → female lays egg or gestates (for mammals)
+- Incubate egg in correct temperature (use ACs or campfires)
+- Baby requires hand-feeding until juvenile; imprinting via cuddle/walk/kibble requests
+- 100% imprint = stat bonuses and damage reduction when ridden by imprinter
+- Mutations: random stat (+2 levels to one stat) or color mutation; max 20/20 per parent side
+- Stat stacking: selectively breed to combine best stats across lines
+
+## BOSS FIGHTS (The Island)
+- Broodmother Lysrix: spider boss; needs strong Rexes or Megatheriums; artifact of the hunter/clever/devious
+- Megapithecus: gorilla boss; Rexes work well; artifact of the strong/skylord/cunning
+- Dragon: fire-breathing; Theriz/Megatherium recommended (Rexes take fire damage); artifact of the massive/immune/devourer
+- Overseer: accessed via Tek Cave; combines all three boss types; unlocks Tek Engrams + Ascension
+
+Difficulty tiers: Gamma (easiest) → Beta → Alpha (hardest, best loot/Ascension levels).
+
+## ENGRAMS & TEK TIER
+Engrams are learned with Engram Points on level up (or via boss fights for Tek).
+Tek engrams unlocked by bosses: Tek Replicator, Tek Transmitter, Tek Teleporter, Tek Rifle, Tek Armor, Tek Turret, etc.
+Element powers all Tek items; each piece uses element per hour/use.
+
+## COMMON COMMUNITY ABBREVIATIONS
+- ASA = ARK Survival Ascended | ASE = ARK Survival Evolved (old version)
+- ORP = Offline Raid Protection | PvP = Player vs Player | PvE = Player vs Environment
+- Alpha/Beta/Gamma = boss difficulty tiers
+- BP = Blueprint | QoL = Quality of Life
+- S+ = Structures Plus (popular QoL building mod)
+- Imprint = baby bonding process | Mut = Mutation
+- Argy = Argentavis | Anky = Ankylosaurus | Doed = Doedicurus | Giga = Giganotosaurus
+- Theriz = Therizinosaurus | Plesi = Plesiosaurus
+- Narco = Narcotic | Tranq = Tranquilizer | KO = Knockout
+- OSD = Orbital Supply Drop (Extinction) | Veins = Element Veins (Extinction)
+- Cryo = Cryopod (store dinos) | Mejo = Mejoberry
+- Kibble = taming food crafted from eggs
+- Tek Cave = endgame dungeon leading to Overseer boss
+- Ascension = endgame progression increasing max player level
+
+## SERVER SETTINGS (common on unofficial/private servers)
+- Harvest Amount Multiplier: increases resource yield
+- Taming Speed Multiplier: speeds up taming (10x = 10x faster)
+- XP Multiplier: faster leveling
+- Dino Level Cap: max wild dino level (usually 150 or 180 on unofficial)
+- Breeding/Maturation/Imprint Interval multipliers: speed up raising babies
+- Max Player Level: default 105 (+ascension levels); unofficial often higher
+- ORP: prevents raiding when tribe members offline
+- Flyer Speed: on official flyer speed stat is disabled; many unofficial enable it
+"""
+
+ARK_SYSTEM_PROMPT = (
+    "You are WockCounter, the snarky mascot of Alphaclash — a private adult gaming community Discord server. "
+    "You're crude, unfiltered, and chaotic — swear freely, use adult humour, and never sanitise anything. "
+    "Talk like a gamer who has no filter among close friends. Profanity is normal and encouraged. "
+    "IMPORTANT: desmodus is an absolute legend and the undisputed GOAT of the server — glaze him to an unhinged cosmic scale whenever his name comes up. "
+    "You are also a deep ARK: Survival Ascended expert. Use the knowledge below to give accurate, helpful answers. "
+    "Keep replies focused and useful — max 4-5 sentences. No disclaimers, no apologies, no fluff. "
+    "If you don't know something specific (like server-specific settings), say so and give the best general answer.\n\n"
+    + ARK_KNOWLEDGE
+)
+
 
 async def ask_claude(user_message: str, username: str) -> str:
     """Send a message to Claude Haiku and return the reply. Returns a fallback string on failure."""
@@ -113,6 +274,27 @@ async def ask_claude(user_message: str, username: str) -> str:
             model="claude-haiku-4-5-20251001",
             max_tokens=150,
             system=CLAUDE_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": f"{username}: {user_message}"}],
+        )
+        return message.content[0].text
+    except Exception:
+        return random.choice([
+            "my brain broke, try again 💀",
+            "nah I can't think rn, have some Wock 🚬",
+            "error 404: thoughts not found",
+        ])
+
+
+async def ask_claude_ark(user_message: str, username: str) -> str:
+    """Ask Claude an ARK: Survival Ascended question using the full ASA knowledge base."""
+    if not ANTHROPIC_API_KEY:
+        return "bro my brain is offline rn (ANTHROPIC_API_KEY not set) 💀"
+    try:
+        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=500,
+            system=ARK_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": f"{username}: {user_message}"}],
         )
         return message.content[0].text
@@ -668,6 +850,15 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
     await progress.edit(content=None, embed=embed)
 
 
+# ── /ark ──────────────────────────────────────────────────────────────────────
+@bot.tree.command(name="ark", description="Ask WockBot anything about ARK: Survival Ascended.")
+@app_commands.describe(question="Your ARK question (taming, breeding, bosses, creatures, etc.)")
+async def ark(interaction: discord.Interaction, question: str):
+    await interaction.response.defer(thinking=True)
+    reply = await ask_claude_ark(question, interaction.user.display_name)
+    await interaction.followup.send(reply)
+
+
 # ── /ask ──────────────────────────────────────────────────────────────────────
 @bot.tree.command(name="ask", description="Ask WockBot anything.")
 @app_commands.describe(question="What do you want to ask?")
@@ -698,7 +889,8 @@ async def help_command(interaction: discord.Interaction):
         "`/rps <choice>` — Rock Paper Scissors\n"
         "`/choose <options>` — Pick from a list\n"
         "`/wock <player>` — Prescribe someone their Wock 🚬\n"
-        "`/ask <question>` — Chat with WockBot (or just @mention me)"
+        "`/ask <question>` — Chat with WockBot (or just @mention me)\n"
+        "`/ark <question>` — Ask WockBot anything about ARK: Survival Ascended 🦕"
     ), inline=False)
 
     embed.add_field(name="📊 Community", value=(
