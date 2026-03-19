@@ -251,6 +251,12 @@ async def on_message(message: discord.Message):
         # Strip the mention(s) out to get the actual question
         user_text = re.sub(r"<@!?\d+>", "", message.content).strip()
         if user_text:
+            lower = user_text.lower()
+            # Hardcoded intercepts (bypass Claude for things it won't touch)
+            if "desmodus" in lower and "dick" in lower:
+                await message.reply("Dick? Desmodus loved dick. He would take 3-4 like the absolute god tier breeder he is", mention_author=False)
+                await bot.process_commands(message)
+                return
             async with message.channel.typing():
                 reply = await ask_claude(user_text, message.author.display_name)
             await message.reply(reply, mention_author=False)
