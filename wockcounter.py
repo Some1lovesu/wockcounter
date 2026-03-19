@@ -7,9 +7,11 @@ import random
 import os
 import time
 import datetime
+import anthropic
 
 # ── TOKEN & CONFIG ───────────────────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 GUILD_ID = 1225611222074921091
 
 MAX_MESSAGES = 40_000   # Maximum messages to scan
@@ -86,6 +88,35 @@ EIGHTBALL_RESPONSES = [
 ]
 
 POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
+
+# ── CLAUDE CONFIG ─────────────────────────────────────────────────────────────
+CLAUDE_SYSTEM_PROMPT = (
+    "You are WockCounter, the snarky mascot of Alphaclash — a gaming community Discord server. "
+    "You love Wock (a fictional cough syrup that's basically the server's meme currency). "
+    "You're helpful but never boring — casual, a little chaotic, and occasionally unhinged. "
+    "Keep replies short (2-3 sentences max). No disclaimers, no fluff."
+)
+
+
+async def ask_claude(user_message: str, username: str) -> str:
+    """Send a message to Claude Haiku and return the reply. Returns a fallback string on failure."""
+    if not ANTHROPIC_API_KEY:
+        return "bro my brain is offline rn (ANTHROPIC_API_KEY not set) 💀"
+    try:
+        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=150,
+            system=CLAUDE_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": f"{username}: {user_message}"}],
+        )
+        return message.content[0].text
+    except Exception:
+        return random.choice([
+            "my brain broke, try again 💀",
+            "nah I can't think rn, have some Wock 🚬",
+            "error 404: thoughts not found",
+        ])
 
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -209,6 +240,17 @@ async def on_ready():
 async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
+
+    # @mention listener — chat with the bot
+    if bot.user in message.mentions:
+        # Strip the mention(s) out to get the actual question
+        user_text = re.sub(r"<@!?\d+>", "", message.content).strip()
+        if user_text:
+            async with message.channel.typing():
+                reply = await ask_claude(user_text, message.author.display_name)
+            await message.reply(reply, mention_author=False)
+            await bot.process_commands(message)
+            return
 
     # Kill feed listener
     match = re.search(r'Your Tribe killed ([^\s!.,\n]+)', message.content, re.IGNORECASE)
@@ -615,6 +657,15 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
     await progress.edit(content=None, embed=embed)
 
 
+# ── /ask ──────────────────────────────────────────────────────────────────────
+@bot.tree.command(name="ask", description="Ask WockBot anything.")
+@app_commands.describe(question="What do you want to ask?")
+async def ask(interaction: discord.Interaction, question: str):
+    await interaction.response.defer(thinking=True)
+    reply = await ask_claude(question, interaction.user.display_name)
+    await interaction.followup.send(reply)
+
+
 # ── /help ─────────────────────────────────────────────────────────────────────
 @bot.tree.command(name="help", description="Show all available WockCounter commands.")
 async def help_command(interaction: discord.Interaction):
@@ -635,7 +686,8 @@ async def help_command(interaction: discord.Interaction):
         "`/roll [dice]` — Roll dice (e.g. `2d6`)\n"
         "`/rps <choice>` — Rock Paper Scissors\n"
         "`/choose <options>` — Pick from a list\n"
-        "`/wock <player>` — Prescribe someone their Wock 🚬"
+        "`/wock <player>` — Prescribe someone their Wock 🚬\n"
+        "`/ask <question>` — Chat with WockBot (or just @mention me)"
     ), inline=False)
 
     embed.add_field(name="📊 Community", value=(
