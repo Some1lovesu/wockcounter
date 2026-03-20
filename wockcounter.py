@@ -64,6 +64,8 @@ def build_base_embed(entry: dict, title_prefix: str = "🎯 Base Logged") -> dis
     """Build a consistent embed for a base entry."""
     embed = discord.Embed(title=f"{title_prefix}: {entry['label']}", color=0xff4500)
     embed.add_field(name="Coordinates", value=f"`{entry['coords']}`", inline=True)
+    if entry.get("map"):
+        embed.add_field(name="Map", value=entry["map"], inline=True)
     embed.add_field(name="Submitted by", value=entry["submitted_by"], inline=True)
     embed.add_field(name="ID", value=f"#{entry['id']}", inline=True)
     submitted_dt = datetime.datetime.fromisoformat(entry["submitted_at"]).replace(tzinfo=datetime.timezone.utc)
@@ -909,12 +911,14 @@ async def ask(interaction: discord.Interaction, question: str):
 @app_commands.describe(
     label="A short name for the base (e.g. 'desert cave', 'enemy alpha')",
     coords="In-game coordinates (e.g. '42.3, 71.0')",
+    map="The map the base is on (e.g. 'Procedural Map', 'Barren')",
     image="Optional screenshot of the base",
 )
 async def addbase(
     interaction: discord.Interaction,
     label: str,
     coords: str,
+    map: str = None,
     image: discord.Attachment = None,
 ):
     # Validate image type if provided
@@ -927,6 +931,7 @@ async def addbase(
         "id": next_base_id(bases),
         "label": label,
         "coords": coords,
+        "map": map,
         "image_url": image.url if image else None,
         "submitted_by": interaction.user.display_name,
         "submitted_by_id": interaction.user.id,
@@ -980,9 +985,10 @@ async def bases_list(interaction: discord.Interaction):
     embed = discord.Embed(title="🎯 Tracked Bases", color=0xff4500)
     for b in recent:
         image_note = " 📷" if b.get("image_url") else ""
+        map_note = f" • {b['map']}" if b.get("map") else ""
         embed.add_field(
             name=f"#{b['id']} — {b['label']}{image_note}",
-            value=f"`{b['coords']}` — by {b['submitted_by']}",
+            value=f"`{b['coords']}`{map_note} — by {b['submitted_by']}",
             inline=False,
         )
     embed.set_footer(text=f"{len(entries)} total base(s) logged • Use /removebase <id> to remove")
