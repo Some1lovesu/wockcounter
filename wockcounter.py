@@ -748,9 +748,12 @@ async def addbase(
     await interaction.response.send_message(f"✅ Base **{label}** logged as **#{entry['id']}**.", ephemeral=True)
 
     # Broadcast to the designated base tracker channel
-    channel = bot.get_channel(BASE_CHANNEL_ID) or await bot.fetch_channel(BASE_CHANNEL_ID)
-    if channel:
+    try:
+        channel = bot.get_channel(BASE_CHANNEL_ID) or await bot.fetch_channel(BASE_CHANNEL_ID)
         await channel.send(embed=embed)
+        print(f"✅ Base #{entry['id']} posted to channel {BASE_CHANNEL_ID}")
+    except Exception as e:
+        print(f"❌ Failed to post base to channel {BASE_CHANNEL_ID}: {e}")
 
 
 # ── /removebase ────────────────────────────────────────────────────────────────
