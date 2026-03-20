@@ -9,6 +9,7 @@ import time
 import datetime
 import json
 import anthropic
+import aiohttp
 
 # ── TOKEN & CONFIG ───────────────────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -886,6 +887,43 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
     await progress.edit(content=None, embed=embed)
 
 
+# ── STEAM HELPERS ─────────────────────────────────────────────────────────────
+async def steam_search(query: str) -> dict | None:
+    """Search the Steam store and return the top result as {appid, name, icon_url}."""
+    url = "https://store.steampowered.com/api/storesearch/"
+    params = {"term": query, "l": "english", "cc": "US"}
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+    items = data.get("items", [])
+    if not items:
+        return None
+    top = items[0]
+    appid = top["id"]
+    return {
+        "appid": appid,
+        "name": top["name"],
+        "icon_url": f"https://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{top.get('tiny_image', '').split('/')[-1]}",
+        "store_url": f"https://store.steampowered.com/app/{appid}",
+    }
+
+
+async def steam_player_count(appid: int) -> int | None:
+    """Return the current player count for a Steam appid, or None on failure."""
+    url = "https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params={"appid": appid}, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+    result = data.get("response", {})
+    if result.get("result") != 1:
+        return None
+    return result["player_count"]
+
+
 # ── /ark ──────────────────────────────────────────────────────────────────────
 @bot.tree.command(name="ark", description="Ask WockBot anything about ARK: Survival Ascended.")
 @app_commands.describe(question="Your ARK question (taming, breeding, bosses, creatures, etc.)")
@@ -902,6 +940,38 @@ async def ask(interaction: discord.Interaction, question: str):
     await interaction.response.defer(thinking=True)
     reply = await ask_claude(question, interaction.user.display_name)
     await interaction.followup.send(reply)
+
+
+# ── /players ──────────────────────────────────────────────────────────────────
+@bot.tree.command(name="players", description="Look up the current Steam player count for a game.")
+@app_commands.describe(game="Game name to search for on Steam")
+async def players(interaction: discord.Interaction, game: str):
+    await interaction.response.defer(thinking=True)
+    try:
+        result = await steam_search(game)
+    except Exception:
+        await interaction.followup.send("❌ Couldn't reach Steam. Try again in a moment.", ephemeral=True)
+        return
+
+    if not result:
+        await interaction.followup.send(f"❌ No Steam game found for **{game}**.", ephemeral=True)
+        return
+
+    try:
+        count = await steam_player_count(result["appid"])
+    except Exception:
+        count = None
+
+    embed = discord.Embed(title=result["name"], url=result["store_url"], color=0x1b2838)
+    embed.set_thumbnail(url=f"https://cdn.cloudflare.steamstatic.com/steam/apps/{result['appid']}/capsule_sm_120.jpg")
+
+    if count is None:
+        embed.description = "⚠️ Player count unavailable for this title."
+    else:
+        embed.add_field(name="🟢 Playing right now", value=f"**{count:,}**", inline=False)
+
+    embed.set_footer(text="Data via Steam API • WockCounter")
+    await interaction.followup.send(embed=embed)
 
 
 # ── /addbase ──────────────────────────────────────────────────────────────────
@@ -1015,7 +1085,8 @@ async def help_command(interaction: discord.Interaction):
         "`/choose <options>` — Pick from a list\n"
         "`/wock <player>` — Prescribe someone their Wock 🚬\n"
         "`/ask <question>` — Chat with WockBot (or just @mention me)\n"
-        "`/ark <question>` — Ask WockBot anything about ARK: Survival Ascended 🦕"
+        "`/ark <question>` — Ask WockBot anything about ARK: Survival Ascended 🦕\n"
+        "`/players <game>` — Live Steam player count for any game"
     ), inline=False)
 
     embed.add_field(name="📊 Community", value=(
