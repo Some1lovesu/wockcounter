@@ -302,46 +302,39 @@ ARK_SYSTEM_PROMPT = (
 )
 
 
-async def ask_claude(user_message: str, username: str) -> str:
+_anthropic_client: anthropic.AsyncAnthropic | None = (
+    anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+)
+
+_CLAUDE_FALLBACKS = [
+    "my brain broke, try again 💀",
+    "nah I can't think rn, have some Wock 🚬",
+    "error 404: thoughts not found",
+]
+
+
+async def _ask_claude(user_message: str, username: str, system: str, max_tokens: int) -> str:
     """Send a message to Claude Haiku and return the reply. Returns a fallback string on failure."""
-    if not ANTHROPIC_API_KEY:
+    if not _anthropic_client:
         return "bro my brain is offline rn (ANTHROPIC_API_KEY not set) 💀"
     try:
-        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-        message = await client.messages.create(
+        message = await _anthropic_client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=150,
-            system=CLAUDE_SYSTEM_PROMPT,
+            max_tokens=max_tokens,
+            system=system,
             messages=[{"role": "user", "content": f"{username}: {user_message}"}],
         )
         return message.content[0].text
     except Exception:
-        return random.choice([
-            "my brain broke, try again 💀",
-            "nah I can't think rn, have some Wock 🚬",
-            "error 404: thoughts not found",
-        ])
+        return random.choice(_CLAUDE_FALLBACKS)
+
+
+async def ask_claude(user_message: str, username: str) -> str:
+    return await _ask_claude(user_message, username, CLAUDE_SYSTEM_PROMPT, 150)
 
 
 async def ask_claude_ark(user_message: str, username: str) -> str:
-    """Ask Claude an ARK: Survival Ascended question using the full ASA knowledge base."""
-    if not ANTHROPIC_API_KEY:
-        return "bro my brain is offline rn (ANTHROPIC_API_KEY not set) 💀"
-    try:
-        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-        message = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=500,
-            system=ARK_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": f"{username}: {user_message}"}],
-        )
-        return message.content[0].text
-    except Exception:
-        return random.choice([
-            "my brain broke, try again 💀",
-            "nah I can't think rn, have some Wock 🚬",
-            "error 404: thoughts not found",
-        ])
+    return await _ask_claude(user_message, username, ARK_SYSTEM_PROMPT, 500)
 
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -430,7 +423,7 @@ async def safe_history(channel, limit, progress_msg=None):
 @tasks.loop(seconds=15)
 async def check_reminders():
     now = time.time()
-    fired = []
+    still_pending = []
     for reminder in pending_reminders:
         if now >= reminder["trigger_at"]:
             channel = bot.get_channel(reminder["channel_id"])
@@ -439,9 +432,9 @@ async def check_reminders():
                     await channel.send(f"⏰ <@{reminder['user_id']}> Reminder: **{reminder['message']}**")
                 except discord.HTTPException:
                     pass
-            fired.append(reminder)
-    for r in fired:
-        pending_reminders.remove(r)
+        else:
+            still_pending.append(reminder)
+    pending_reminders[:] = still_pending
 
 
 # ── EVENT: ON READY ───────────────────────────────────────────────────────────
@@ -578,7 +571,7 @@ async def ping(interaction: discord.Interaction):
 async def uptime(interaction: discord.Interaction):
     elapsed = time.time() - START_TIME
     embed = discord.Embed(title="⏱️ Bot Uptime", description=format_uptime(elapsed), color=0x7289da)
-    embed.set_footer(text=f"Online since {datetime.datetime.utcfromtimestamp(START_TIME).strftime('%Y-%m-%d %H:%M UTC')}")
+    embed.set_footer(text=f"Online since {datetime.datetime.fromtimestamp(START_TIME, tz=datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     await interaction.response.send_message(embed=embed)
 
 
@@ -633,9 +626,14 @@ async def avatar(interaction: discord.Interaction, member: discord.Member = None
 @bot.tree.command(name="membercount", description="Show the server's member count breakdown.")
 async def membercount(interaction: discord.Interaction):
     guild = interaction.guild
-    humans = sum(1 for m in guild.members if not m.bot)
-    bots = sum(1 for m in guild.members if m.bot)
-    online = sum(1 for m in guild.members if m.status != discord.Status.offline)
+    humans = bots = online = 0
+    for m in guild.members:
+        if m.bot:
+            bots += 1
+        else:
+            humans += 1
+        if m.status != discord.Status.offline:
+            online += 1
     embed = discord.Embed(title=f"👥 {guild.name} — Member Count", color=0x7289da)
     embed.add_field(name="Total", value=f"**{guild.member_count:,}**", inline=True)
     embed.add_field(name="Humans", value=f"**{humans:,}**", inline=True)
@@ -826,7 +824,7 @@ async def remindme(interaction: discord.Interaction, duration: str, reminder: st
         "message": reminder,
         "trigger_at": trigger_at,
     })
-    trigger_dt = datetime.datetime.utcfromtimestamp(trigger_at).replace(tzinfo=datetime.timezone.utc)
+    trigger_dt = datetime.datetime.fromtimestamp(trigger_at, tz=datetime.timezone.utc)
     embed = discord.Embed(title="⏰ Reminder Set!", color=0x00ff00)
     embed.add_field(name="Reminder", value=reminder, inline=False)
     embed.add_field(name="Fires", value=discord.utils.format_dt(trigger_dt, style="R"), inline=True)
@@ -935,7 +933,7 @@ async def addbase(
         "image_url": image.url if image else None,
         "submitted_by": interaction.user.display_name,
         "submitted_by_id": interaction.user.id,
-        "submitted_at": datetime.datetime.utcnow().isoformat(),
+        "submitted_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
     bases.append(entry)
     save_bases(bases)
