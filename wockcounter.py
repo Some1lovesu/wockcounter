@@ -7,12 +7,15 @@ import random
 import os
 import time
 import datetime
+import json
 import anthropic
 
 # ── TOKEN & CONFIG ───────────────────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 GUILD_ID = 1225611222074921091
+# Channel where new base entries are broadcast. Set BASE_CHANNEL_ID in your environment.
+BASE_CHANNEL_ID: int | None = int(os.environ["BASE_CHANNEL_ID"]) if os.environ.get("BASE_CHANNEL_ID") else None
 
 MAX_MESSAGES = 40_000   # Maximum messages to scan
 BATCH_SIZE = 100         # Discord's max per request
@@ -33,6 +36,42 @@ afk_users: dict[int, dict] = {}
 
 # Pending reminders: list of dicts with keys user_id, channel_id, message, trigger_at
 pending_reminders: list[dict] = []
+
+# ── BASE TRACKER ──────────────────────────────────────────────────────────────
+BASES_FILE = "bases.json"
+
+
+def load_bases() -> list[dict]:
+    """Load base entries from disk. Returns an empty list if the file doesn't exist."""
+    if not os.path.exists(BASES_FILE):
+        return []
+    with open(BASES_FILE, "r") as f:
+        return json.load(f)
+
+
+def save_bases(bases: list[dict]) -> None:
+    """Persist base entries to disk."""
+    with open(BASES_FILE, "w") as f:
+        json.dump(bases, f, indent=2)
+
+
+def next_base_id(bases: list[dict]) -> int:
+    """Return one higher than the current max ID, starting at 1."""
+    return max((b["id"] for b in bases), default=0) + 1
+
+
+def build_base_embed(entry: dict, title_prefix: str = "🎯 Base Logged") -> discord.Embed:
+    """Build a consistent embed for a base entry."""
+    embed = discord.Embed(title=f"{title_prefix}: {entry['label']}", color=0xff4500)
+    embed.add_field(name="Coordinates", value=f"`{entry['coords']}`", inline=True)
+    embed.add_field(name="Submitted by", value=entry["submitted_by"], inline=True)
+    embed.add_field(name="ID", value=f"#{entry['id']}", inline=True)
+    submitted_dt = datetime.datetime.fromisoformat(entry["submitted_at"]).replace(tzinfo=datetime.timezone.utc)
+    embed.add_field(name="Logged", value=discord.utils.format_dt(submitted_dt, style="R"), inline=True)
+    if entry.get("image_url"):
+        embed.set_image(url=entry["image_url"])
+    embed.set_footer(text="WockCounter Base Tracker")
+    return embed
 
 
 # ── KILL FEED RESPONSES ──────────────────────────────────────────────────────
@@ -674,6 +713,89 @@ async def ask(interaction: discord.Interaction, question: str):
     await interaction.followup.send(reply)
 
 
+# ── /addbase ──────────────────────────────────────────────────────────────────
+@bot.tree.command(name="addbase", description="Log a base to the tracker.")
+@app_commands.describe(
+    label="A short name for the base (e.g. 'desert cave', 'enemy alpha')",
+    coords="In-game coordinates (e.g. '42.3, 71.0')",
+    image="Optional screenshot of the base",
+)
+async def addbase(
+    interaction: discord.Interaction,
+    label: str,
+    coords: str,
+    image: discord.Attachment = None,
+):
+    # Validate image type if provided
+    if image and not image.content_type.startswith("image/"):
+        await interaction.response.send_message("❌ Attachment must be an image.", ephemeral=True)
+        return
+
+    bases = load_bases()
+    entry = {
+        "id": next_base_id(bases),
+        "label": label,
+        "coords": coords,
+        "image_url": image.url if image else None,
+        "submitted_by": interaction.user.display_name,
+        "submitted_by_id": interaction.user.id,
+        "submitted_at": datetime.datetime.utcnow().isoformat(),
+    }
+    bases.append(entry)
+    save_bases(bases)
+
+    embed = build_base_embed(entry)
+    await interaction.response.send_message(f"✅ Base **{label}** logged as **#{entry['id']}**.", ephemeral=True)
+
+    # Broadcast to the designated base tracker channel if configured
+    if BASE_CHANNEL_ID:
+        channel = interaction.guild.get_channel(BASE_CHANNEL_ID)
+        if channel:
+            await channel.send(embed=embed)
+
+
+# ── /removebase ────────────────────────────────────────────────────────────────
+@bot.tree.command(name="removebase", description="Remove a base from the tracker by ID (mod only).")
+@app_commands.describe(base_id="The ID of the base to remove (see /bases)")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def removebase(interaction: discord.Interaction, base_id: int):
+    bases = load_bases()
+    match = next((b for b in bases if b["id"] == base_id), None)
+    if not match:
+        await interaction.response.send_message(f"❌ No base found with ID **#{base_id}**.", ephemeral=True)
+        return
+    bases.remove(match)
+    save_bases(bases)
+    await interaction.response.send_message(f"🗑️ Base **#{base_id}** ({match['label']}) removed.", ephemeral=True)
+
+@removebase.error
+async def removebase_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message("❌ You need **Manage Messages** permission to remove bases.", ephemeral=True)
+
+
+# ── /bases ────────────────────────────────────────────────────────────────────
+@bot.tree.command(name="bases", description="List all tracked bases.")
+async def bases_list(interaction: discord.Interaction):
+    entries = load_bases()
+    if not entries:
+        await interaction.response.send_message("📭 No bases have been logged yet.", ephemeral=True)
+        return
+
+    # Show the 10 most recently added bases
+    recent = entries[-10:][::-1]
+    embed = discord.Embed(title="🎯 Tracked Bases", color=0xff4500)
+    for b in recent:
+        image_note = " 📷" if b.get("image_url") else ""
+        embed.add_field(
+            name=f"#{b['id']} — {b['label']}{image_note}",
+            value=f"`{b['coords']}` — by {b['submitted_by']}",
+            inline=False,
+        )
+    embed.set_footer(text=f"{len(entries)} total base(s) logged • Use /removebase <id> to remove")
+    await interaction.response.send_message(embed=embed)
+
+
 # ── /help ─────────────────────────────────────────────────────────────────────
 @bot.tree.command(name="help", description="Show all available WockCounter commands.")
 async def help_command(interaction: discord.Interaction):
@@ -704,6 +826,12 @@ async def help_command(interaction: discord.Interaction):
         "`/count <phrase> [limit]` — Count phrase occurrences\n"
         "`/remindme <time> <message>` — Set a reminder\n"
         "`/afk [reason]` — Set your AFK status"
+    ), inline=False)
+
+    embed.add_field(name="🎯 Base Tracker", value=(
+        "`/addbase <label> <coords> [image]` — Log a base\n"
+        "`/bases` — List tracked bases\n"
+        "`/removebase <id>` — Remove a base *(Manage Messages)*"
     ), inline=False)
 
     embed.add_field(name="🛡️ Moderation", value=(
