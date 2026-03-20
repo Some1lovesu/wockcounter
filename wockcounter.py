@@ -15,7 +15,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 GUILD_ID = 1225611222074921091
 # Channel where new base entries are broadcast.
-BASE_CHANNEL_ID: int = 1260089791161040978
+BASE_CHANNEL_ID: int = 1472237058503348315
 
 MAX_MESSAGES = 40_000   # Maximum messages to scan
 BATCH_SIZE = 100         # Discord's max per request
