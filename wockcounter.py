@@ -938,11 +938,10 @@ async def addbase(
     embed = build_base_embed(entry)
     await interaction.response.send_message(f"✅ Base **{label}** logged as **#{entry['id']}**.", ephemeral=True)
 
-    # Broadcast to the designated base tracker channel if configured
-    if BASE_CHANNEL_ID:
-        channel = interaction.guild.get_channel(BASE_CHANNEL_ID)
-        if channel:
-            await channel.send(embed=embed)
+    # Broadcast to the designated base tracker channel
+    channel = bot.get_channel(BASE_CHANNEL_ID) or await bot.fetch_channel(BASE_CHANNEL_ID)
+    if channel:
+        await channel.send(embed=embed)
 
 
 # ── /removebase ────────────────────────────────────────────────────────────────
