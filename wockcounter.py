@@ -14,6 +14,7 @@ import aiohttp
 # ── TOKEN & CONFIG ───────────────────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+TENOR_API_KEY = os.environ.get("TENOR_API_KEY")
 GUILD_ID = 1225611222074921091
 # Channel where new base entries are broadcast.
 BASE_CHANNEL_ID: int = 1472237058503348315
@@ -314,24 +315,31 @@ _CLAUDE_FALLBACKS = [
 ]
 
 
-async def _ask_claude(user_message: str, username: str, system: str, max_tokens: int) -> str:
+async def _ask_claude(user_message: str, username: str, system: str, max_tokens: int, image_url: str | None = None) -> str:
     """Send a message to Claude Haiku and return the reply. Returns a fallback string on failure."""
     if not _anthropic_client:
         return "bro my brain is offline rn (ANTHROPIC_API_KEY not set) 💀"
     try:
+        if image_url:
+            content = [
+                {"type": "image", "source": {"type": "url", "url": image_url}},
+                {"type": "text", "text": f"{username}: {user_message}"},
+            ]
+        else:
+            content = f"{username}: {user_message}"
         message = await _anthropic_client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=max_tokens,
             system=system,
-            messages=[{"role": "user", "content": f"{username}: {user_message}"}],
+            messages=[{"role": "user", "content": content}],
         )
         return message.content[0].text
     except Exception:
         return random.choice(_CLAUDE_FALLBACKS)
 
 
-async def ask_claude(user_message: str, username: str) -> str:
-    return await _ask_claude(user_message, username, CLAUDE_SYSTEM_PROMPT, 150)
+async def ask_claude(user_message: str, username: str, image_url: str | None = None) -> str:
+    return await _ask_claude(user_message, username, CLAUDE_SYSTEM_PROMPT, 150, image_url)
 
 
 async def ask_claude_ark(user_message: str, username: str) -> str:
@@ -464,7 +472,24 @@ async def on_message(message: discord.Message):
     if bot.user in message.mentions:
         # Strip the mention(s) out to get the actual question
         user_text = re.sub(r"<@!?\d+>", "", message.content).strip()
-        if user_text:
+
+        # Detect image/GIF from attachments or Tenor/Giphy embeds
+        media_url = None
+        for attachment in message.attachments:
+            if attachment.content_type and attachment.content_type.startswith("image/"):
+                media_url = attachment.url
+                break
+        if not media_url:
+            for embed in message.embeds:
+                if embed.type == "gifv":
+                    # Use the thumbnail as a static preview Claude can analyze
+                    if embed.thumbnail and embed.thumbnail.url:
+                        media_url = embed.thumbnail.url
+                    break
+
+        if user_text or media_url:
+            if not user_text:
+                user_text = "react to this gif"
             lower = user_text.lower()
             # Hardcoded intercepts (bypass Claude for things it won't touch)
             if "desmodus" in lower and "dick" in lower:
@@ -472,7 +497,7 @@ async def on_message(message: discord.Message):
                 await bot.process_commands(message)
                 return
             async with message.channel.typing():
-                reply = await ask_claude(user_text, message.author.display_name)
+                reply = await ask_claude(user_text, message.author.display_name, image_url=media_url)
             await message.reply(reply, mention_author=False)
             await bot.process_commands(message)
             return
@@ -739,6 +764,21 @@ async def choose(interaction: discord.Interaction, options: str):
     await interaction.response.send_message(embed=embed)
 
 
+# ── /gif ──────────────────────────────────────────────────────────────────────
+@bot.tree.command(name="gif", description="Search Tenor for a GIF and post it.")
+@app_commands.describe(query="What GIF to search for")
+async def gif_cmd(interaction: discord.Interaction, query: str):
+    if not TENOR_API_KEY:
+        await interaction.response.send_message("❌ Tenor API key not configured (set TENOR_API_KEY).", ephemeral=True)
+        return
+    await interaction.response.defer()
+    gif_url = await tenor_search(query)
+    if not gif_url:
+        await interaction.followup.send(f"😔 Couldn't find a GIF for **{query}**.")
+        return
+    await interaction.followup.send(gif_url)
+
+
 # ── /poll ─────────────────────────────────────────────────────────────────────
 @bot.tree.command(name="poll", description="Create a poll with up to 4 options.")
 @app_commands.describe(
@@ -885,6 +925,28 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
     embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
 
     await progress.edit(content=None, embed=embed)
+
+
+# ── TENOR HELPERS ─────────────────────────────────────────────────────────────
+async def tenor_search(query: str) -> str | None:
+    """Search Tenor for a GIF matching the query. Returns a direct GIF URL or None."""
+    if not TENOR_API_KEY:
+        return None
+    url = "https://tenor.googleapis.com/v2/search"
+    params = {"q": query, "key": TENOR_API_KEY, "limit": 8, "media_filter": "gif"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+        results = data.get("results", [])
+        if not results:
+            return None
+        result = random.choice(results)
+        return result.get("media_formats", {}).get("gif", {}).get("url")
+    except Exception:
+        return None
 
 
 # ── STEAM HELPERS ─────────────────────────────────────────────────────────────
@@ -1086,6 +1148,7 @@ async def help_command(interaction: discord.Interaction):
         "`/wock <player>` — Prescribe someone their Wock 🚬\n"
         "`/ask <question>` — Chat with WockBot (or just @mention me)\n"
         "`/ark <question>` — Ask WockBot anything about ARK: Survival Ascended 🦕\n"
+        "`/gif <query>` — Search Tenor for a GIF\n"
         "`/players <game>` — Live Steam player count for any game"
     ), inline=False)
 
