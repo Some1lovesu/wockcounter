@@ -517,19 +517,32 @@ async def on_message(message: discord.Message):
         # Strip the mention(s) out to get the actual question
         user_text = re.sub(r"<@!?\d+>", "", message.content).strip()
 
-        # Detect image/GIF from attachments or Tenor/Giphy embeds
-        media_url = None
-        for attachment in message.attachments:
-            if attachment.content_type and attachment.content_type.startswith("image/"):
-                media_url = attachment.url
-                break
-        if not media_url:
-            for embed in message.embeds:
-                if embed.type == "gifv":
-                    # Use the thumbnail as a static preview Claude can analyze
-                    if embed.thumbnail and embed.thumbnail.url:
-                        media_url = embed.thumbnail.url
-                    break
+        # Detect image/GIF from attachments or embeds
+        def _extract_media(msg: discord.Message) -> str | None:
+            for att in msg.attachments:
+                if att.content_type and att.content_type.startswith("image/"):
+                    return att.url
+            for emb in msg.embeds:
+                if emb.type in ("gifv", "image"):
+                    # Prefer thumbnail (static preview) so Claude can analyse it
+                    if emb.thumbnail and emb.thumbnail.url:
+                        return emb.thumbnail.url
+                    if emb.url:
+                        return emb.url
+            return None
+
+        media_url = _extract_media(message)
+
+        # If the user replied to a message that contains the GIF, look there too
+        if not media_url and message.reference:
+            ref = message.reference.resolved
+            if not isinstance(ref, discord.Message):
+                try:
+                    ref = await message.channel.fetch_message(message.reference.message_id)
+                except discord.HTTPException:
+                    ref = None
+            if isinstance(ref, discord.Message):
+                media_url = _extract_media(ref)
 
         if user_text or media_url:
             if not user_text:
