@@ -133,12 +133,35 @@ POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
 
 # ── POSITIVE REACTION ─────────────────────────────────────────────────────────
 POSITIVE_PATTERNS = re.compile(
-    r'\b(gg+|good game|well played|wp|congrats?|congratulations|gra(t[sz])|'
-    r'nice+|noice|lets?\s*go|lfg|'
-    r'fire|awesome|amazing|insane|cracked|'
-    r'yay+|woo+|dub|clutch|'
-    r'based|goat|nailed it|hell yeah|'
-    r'big\s*w|absolute\s*w)\b',
+    r'\b('
+    # gaming / esports
+    r'gg+|good game|well played|wp|mvp|ez\s*clap|pog+|poggers|pogchamp|'
+    r'lets?\s*go|lfg|clutch(ed)?|no\s*scope|head\s*shot|'
+    r'dub|big\s*dub|taking\s*(the\s*)?dub|'
+    # celebration / hype
+    r'yay+|woo+|woot|wahoo|woohoo|hype|hyped|lets?\s*get\s*it|'
+    r'lezz?\s*go|letsss+\s*go|go+al|'
+    # compliments / affirmations
+    r'congrats?|congratulations|gra(t[sz])|props|mad\s*props|respect|'
+    r'well\s*done|good\s*job|good\s*shit|great\s*job|nice\s*work|'
+    r'keep\s*it\s*up|proud\s*(of\s*you)?|'
+    # hype adjectives
+    r'fire|lit|bussin|slaps|hard|goes\s*hard|'
+    r'nice+|noice|sick|clean|smooth|crispy|nasty|dirty\s*(play)?|'
+    r'insane|crazy|wild|cracked|godly|god\s*tier|'
+    r'awesome|amazing|incredible|unreal|unbelievable|'
+    r'legendary|epic|elite|goated?|'
+    # internet slang positivity
+    r'based|no\s*cap|fr\s*fr|slay(ing)?|ate(\s*that)?|period|'
+    r'big\s*w|absolute\s*w|massive\s*w|\bw\s*\+|on\s*god|facts|'
+    r'valid|lowkey\s*(fire|good|nice|cracked)|'
+    # wholesome / general positive
+    r'love\s*(it|this|that)|so\s*good|too\s*good|'
+    r'nailed\s*it|killed\s*it|crushed\s*it|smashed\s*it|'
+    r'hell\s*yeah|hell\s*yes|hell\s*yea|'
+    r"that'?s\s*my\s*(guy|girl|dude|bro)|"
+    r'goat|legend(ary)?|king|queen|absolute\s*unit|'
+    r'blessed|clutch\s*god|diff)\b',
     re.IGNORECASE,
 )
 POSITIVE_REACTIONS = ["🎉", "🥳", "🔥", "✨", "💪", "👏"]
