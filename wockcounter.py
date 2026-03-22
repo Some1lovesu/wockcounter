@@ -131,6 +131,18 @@ EIGHTBALL_RESPONSES = [
 
 POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
 
+# ── POSITIVE REACTION ─────────────────────────────────────────────────────────
+POSITIVE_PATTERNS = re.compile(
+    r'\b(gg+|good game|well played|wp|congrats?|congratulations|gra(t[sz])|'
+    r'nice+|noice|lets?\s*go|lfg|'
+    r'fire|awesome|amazing|insane|cracked|'
+    r'yay+|woo+|dub|clutch|'
+    r'based|goat|nailed it|hell yeah|'
+    r'big\s*w|absolute\s*w)\b',
+    re.IGNORECASE,
+)
+POSITIVE_REACTIONS = ["🎉", "🥳", "🔥", "✨", "💪", "👏"]
+
 # ── CLAUDE CONFIG ─────────────────────────────────────────────────────────────
 CLAUDE_SYSTEM_PROMPT = (
     "You are WockCounter, the snarky mascot of Alphaclash — a private adult gaming community Discord server. "
@@ -466,6 +478,13 @@ async def on_ready():
 async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
+
+    # Positive vibe detector — react with a celebration emoji
+    if POSITIVE_PATTERNS.search(message.content) and random.random() < 0.6:
+        try:
+            await message.add_reaction(random.choice(POSITIVE_REACTIONS))
+        except discord.HTTPException:
+            pass
 
     # @mention listener — chat with the bot
     if bot.user in message.mentions:
