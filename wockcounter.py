@@ -131,6 +131,41 @@ EIGHTBALL_RESPONSES = [
 
 POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
 
+# ── POSITIVE REACTION ─────────────────────────────────────────────────────────
+POSITIVE_PATTERNS = re.compile(
+    r'\b('
+    # gaming / esports
+    r'gg+|good game|well played|wp|mvp|ez\s*clap|pog+|poggers|pogchamp|'
+    r'lets?\s*go|lfg|clutch(ed)?|no\s*scope|head\s*shot|'
+    r'dub|big\s*dub|taking\s*(the\s*)?dub|'
+    # celebration / hype
+    r'yay+|woo+|woot|wahoo|woohoo|hype|hyped|lets?\s*get\s*it|'
+    r'lezz?\s*go|letsss+\s*go|go+al|'
+    # compliments / affirmations
+    r'congrats?|congratulations|gra(t[sz])|props|mad\s*props|respect|'
+    r'well\s*done|good\s*job|good\s*shit|great\s*job|nice\s*work|'
+    r'keep\s*it\s*up|proud\s*(of\s*you)?|'
+    # hype adjectives
+    r'fire|lit|bussin|slaps|hard|goes\s*hard|'
+    r'nice+|noice|sick|clean|smooth|crispy|nasty|dirty\s*(play)?|'
+    r'insane|crazy|wild|cracked|godly|god\s*tier|'
+    r'awesome|amazing|incredible|unreal|unbelievable|'
+    r'legendary|epic|elite|goated?|'
+    # internet slang positivity
+    r'based|no\s*cap|fr\s*fr|slay(ing)?|ate(\s*that)?|period|'
+    r'big\s*w|absolute\s*w|massive\s*w|\bw\s*\+|on\s*god|facts|'
+    r'valid|lowkey\s*(fire|good|nice|cracked)|'
+    # wholesome / general positive
+    r'love\s*(it|this|that)|so\s*good|too\s*good|'
+    r'nailed\s*it|killed\s*it|crushed\s*it|smashed\s*it|'
+    r'hell\s*yeah|hell\s*yes|hell\s*yea|'
+    r"that'?s\s*my\s*(guy|girl|dude|bro)|"
+    r'goat|legend(ary)?|king|queen|absolute\s*unit|'
+    r'blessed|clutch\s*god|diff)\b',
+    re.IGNORECASE,
+)
+POSITIVE_REACTIONS = ["🎉", "🥳", "🔥", "✨", "💪", "👏"]
+
 # ── CLAUDE CONFIG ─────────────────────────────────────────────────────────────
 CLAUDE_SYSTEM_PROMPT = (
     "You are WockCounter, the snarky mascot of Alphaclash — a private adult gaming community Discord server. "
@@ -314,24 +349,31 @@ _CLAUDE_FALLBACKS = [
 ]
 
 
-async def _ask_claude(user_message: str, username: str, system: str, max_tokens: int) -> str:
+async def _ask_claude(user_message: str, username: str, system: str, max_tokens: int, image_url: str | None = None) -> str:
     """Send a message to Claude Haiku and return the reply. Returns a fallback string on failure."""
     if not _anthropic_client:
         return "bro my brain is offline rn (ANTHROPIC_API_KEY not set) 💀"
     try:
+        if image_url:
+            content = [
+                {"type": "image", "source": {"type": "url", "url": image_url}},
+                {"type": "text", "text": f"{username}: {user_message}"},
+            ]
+        else:
+            content = f"{username}: {user_message}"
         message = await _anthropic_client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=max_tokens,
             system=system,
-            messages=[{"role": "user", "content": f"{username}: {user_message}"}],
+            messages=[{"role": "user", "content": content}],
         )
         return message.content[0].text
     except Exception:
         return random.choice(_CLAUDE_FALLBACKS)
 
 
-async def ask_claude(user_message: str, username: str) -> str:
-    return await _ask_claude(user_message, username, CLAUDE_SYSTEM_PROMPT, 150)
+async def ask_claude(user_message: str, username: str, image_url: str | None = None) -> str:
+    return await _ask_claude(user_message, username, CLAUDE_SYSTEM_PROMPT, 150, image_url)
 
 
 async def ask_claude_ark(user_message: str, username: str) -> str:
@@ -460,11 +502,35 @@ async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
 
+    # Positive vibe detector — react with a celebration emoji
+    if POSITIVE_PATTERNS.search(message.content) and random.random() < 0.6:
+        try:
+            await message.add_reaction(random.choice(POSITIVE_REACTIONS))
+        except discord.HTTPException:
+            pass
+
     # @mention listener — chat with the bot
     if bot.user in message.mentions:
         # Strip the mention(s) out to get the actual question
         user_text = re.sub(r"<@!?\d+>", "", message.content).strip()
-        if user_text:
+
+        # Detect image/GIF from attachments or Tenor/Giphy embeds
+        media_url = None
+        for attachment in message.attachments:
+            if attachment.content_type and attachment.content_type.startswith("image/"):
+                media_url = attachment.url
+                break
+        if not media_url:
+            for embed in message.embeds:
+                if embed.type == "gifv":
+                    # Use the thumbnail as a static preview Claude can analyze
+                    if embed.thumbnail and embed.thumbnail.url:
+                        media_url = embed.thumbnail.url
+                    break
+
+        if user_text or media_url:
+            if not user_text:
+                user_text = "react to this gif"
             lower = user_text.lower()
             # Hardcoded intercepts (bypass Claude for things it won't touch)
             if "desmodus" in lower and "dick" in lower:
@@ -472,7 +538,7 @@ async def on_message(message: discord.Message):
                 await bot.process_commands(message)
                 return
             async with message.channel.typing():
-                reply = await ask_claude(user_text, message.author.display_name)
+                reply = await ask_claude(user_text, message.author.display_name, image_url=media_url)
             await message.reply(reply, mention_author=False)
             await bot.process_commands(message)
             return
