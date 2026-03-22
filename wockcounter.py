@@ -131,6 +131,9 @@ EIGHTBALL_RESPONSES = [
 
 POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
 
+# ── KILL FEED PATTERN ─────────────────────────────────────────────────────────
+KILL_PATTERN = re.compile(r'Your Tribe killed ([^\s!.,\n]+)', re.IGNORECASE)
+
 # ── POSITIVE REACTION ─────────────────────────────────────────────────────────
 POSITIVE_PATTERNS = re.compile(
     r'\b('
@@ -153,7 +156,7 @@ POSITIVE_PATTERNS = re.compile(
     r'legendary|epic|elite|goated?|'
     # internet slang positivity
     r'based|no\s*cap|fr\s*fr|slay(ing)?|ate(\s*that)?|period|'
-    r'big\s*w|absolute\s*w|massive\s*w|\bw\s*\+|on\s*god|facts|'
+    r'big\s*w|absolute\s*w|massive\s*w|w\s*\+|on\s*god|facts|'
     r'valid|lowkey\s*(fire|good|nice|cracked)|'
     # wholesome / general positive
     r'love\s*(it|this|that)|so\s*good|too\s*good|'
@@ -427,11 +430,11 @@ async def safe_history(channel, limit, progress_msg=None):
     while remaining > 0:
         fetch_size = min(BATCH_SIZE, remaining)
 
+        kwargs = {"limit": fetch_size}
+        if last_message_id:
+            kwargs["before"] = discord.Object(id=last_message_id)
         for attempt in range(5):
             try:
-                kwargs = {"limit": fetch_size}
-                if last_message_id:
-                    kwargs["before"] = discord.Object(id=last_message_id)
                 batch = [m async for m in channel.history(**kwargs)]
                 break
             except discord.HTTPException as e:
@@ -544,7 +547,7 @@ async def on_message(message: discord.Message):
             return
 
     # Kill feed listener
-    match = re.search(r'Your Tribe killed ([^\s!.,\n]+)', message.content, re.IGNORECASE)
+    match = KILL_PATTERN.search(message.content)
     if match:
         player_name = match.group(1)
         response = random.choice(KILL_RESPONSES).format(name=player_name)
@@ -932,7 +935,7 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
 
     kill_counts: dict[str, int] = {}
     for msg in messages:
-        m = re.search(r'Your Tribe killed ([^\s!.,\n]+)', msg.content, re.IGNORECASE)
+        m = KILL_PATTERN.search(msg.content)
         if m:
             name = m.group(1)
             kill_counts[name] = kill_counts.get(name, 0) + 1
@@ -954,15 +957,14 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
 
 
 # ── STEAM HELPERS ─────────────────────────────────────────────────────────────
-async def steam_search(query: str) -> dict | None:
+async def steam_search(query: str, session: aiohttp.ClientSession) -> dict | None:
     """Search the Steam store and return the top result as {appid, name, icon_url}."""
     url = "https://store.steampowered.com/api/storesearch/"
     params = {"term": query, "l": "english", "cc": "US"}
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=8)) as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
+    async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+        if resp.status != 200:
+            return None
+        data = await resp.json()
     items = data.get("items", [])
     if not items:
         return None
@@ -971,19 +973,17 @@ async def steam_search(query: str) -> dict | None:
     return {
         "appid": appid,
         "name": top["name"],
-        "icon_url": f"https://media.steampowered.com/steamcommunity/public/images/apps/{appid}/{top.get('tiny_image', '').split('/')[-1]}",
         "store_url": f"https://store.steampowered.com/app/{appid}",
     }
 
 
-async def steam_player_count(appid: int) -> int | None:
+async def steam_player_count(appid: int, session: aiohttp.ClientSession) -> int | None:
     """Return the current player count for a Steam appid, or None on failure."""
     url = "https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params={"appid": appid}, timeout=aiohttp.ClientTimeout(total=8)) as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
+    async with session.get(url, params={"appid": appid}, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+        if resp.status != 200:
+            return None
+        data = await resp.json()
     result = data.get("response", {})
     if result.get("result") != 1:
         return None
@@ -1014,19 +1014,18 @@ async def ask(interaction: discord.Interaction, question: str):
 async def players(interaction: discord.Interaction, game: str):
     await interaction.response.defer(thinking=True)
     try:
-        result = await steam_search(game)
+        async with aiohttp.ClientSession() as session:
+            result = await steam_search(game, session)
+            if not result:
+                await interaction.followup.send(f"❌ No Steam game found for **{game}**.", ephemeral=True)
+                return
+            try:
+                count = await steam_player_count(result["appid"], session)
+            except Exception:
+                count = None
     except Exception:
         await interaction.followup.send("❌ Couldn't reach Steam. Try again in a moment.", ephemeral=True)
         return
-
-    if not result:
-        await interaction.followup.send(f"❌ No Steam game found for **{game}**.", ephemeral=True)
-        return
-
-    try:
-        count = await steam_player_count(result["appid"])
-    except Exception:
-        count = None
 
     embed = discord.Embed(title=result["name"], url=result["store_url"], color=0x1b2838)
     embed.set_thumbnail(url=f"https://cdn.cloudflare.steamstatic.com/steam/apps/{result['appid']}/capsule_sm_120.jpg")
