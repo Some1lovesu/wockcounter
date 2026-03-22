@@ -14,7 +14,6 @@ import aiohttp
 # ── TOKEN & CONFIG ───────────────────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-TENOR_API_KEY = os.environ.get("TENOR_API_KEY")
 GUILD_ID = 1225611222074921091
 # Channel where new base entries are broadcast.
 BASE_CHANNEL_ID: int = 1472237058503348315
@@ -764,21 +763,6 @@ async def choose(interaction: discord.Interaction, options: str):
     await interaction.response.send_message(embed=embed)
 
 
-# ── /gif ──────────────────────────────────────────────────────────────────────
-@bot.tree.command(name="gif", description="Search Tenor for a GIF and post it.")
-@app_commands.describe(query="What GIF to search for")
-async def gif_cmd(interaction: discord.Interaction, query: str):
-    if not TENOR_API_KEY:
-        await interaction.response.send_message("❌ Tenor API key not configured (set TENOR_API_KEY).", ephemeral=True)
-        return
-    await interaction.response.defer()
-    gif_url = await tenor_search(query)
-    if not gif_url:
-        await interaction.followup.send(f"😔 Couldn't find a GIF for **{query}**.")
-        return
-    await interaction.followup.send(gif_url)
-
-
 # ── /poll ─────────────────────────────────────────────────────────────────────
 @bot.tree.command(name="poll", description="Create a poll with up to 4 options.")
 @app_commands.describe(
@@ -925,28 +909,6 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
     embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
 
     await progress.edit(content=None, embed=embed)
-
-
-# ── TENOR HELPERS ─────────────────────────────────────────────────────────────
-async def tenor_search(query: str) -> str | None:
-    """Search Tenor for a GIF matching the query. Returns a direct GIF URL or None."""
-    if not TENOR_API_KEY:
-        return None
-    url = "https://tenor.googleapis.com/v2/search"
-    params = {"q": query, "key": TENOR_API_KEY, "limit": 8, "media_filter": "gif"}
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=8)) as resp:
-                if resp.status != 200:
-                    return None
-                data = await resp.json()
-        results = data.get("results", [])
-        if not results:
-            return None
-        result = random.choice(results)
-        return result.get("media_formats", {}).get("gif", {}).get("url")
-    except Exception:
-        return None
 
 
 # ── STEAM HELPERS ─────────────────────────────────────────────────────────────
@@ -1148,7 +1110,6 @@ async def help_command(interaction: discord.Interaction):
         "`/wock <player>` — Prescribe someone their Wock 🚬\n"
         "`/ask <question>` — Chat with WockBot (or just @mention me)\n"
         "`/ark <question>` — Ask WockBot anything about ARK: Survival Ascended 🦕\n"
-        "`/gif <query>` — Search Tenor for a GIF\n"
         "`/players <game>` — Live Steam player count for any game"
     ), inline=False)
 
