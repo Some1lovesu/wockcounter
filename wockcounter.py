@@ -1006,19 +1006,41 @@ async def tribes(interaction: discord.Interaction, limit: int = MAX_MESSAGES):
         await progress.edit(content="📭 No tribe log messages found in the scanned history.")
         return
 
-    sorted_tribes = sorted(tribe_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-    medals = ["🥇", "🥈", "🥉"] + ["🏴‍☠️"] * 7
+    sorted_tribes = sorted(tribe_counts.items(), key=lambda x: x[1], reverse=True)
+    medals = ["🥇", "🥈", "🥉"]
+
+    def rank_prefix(i: int) -> str:
+        return medals[i] if i < len(medals) else f"`{i + 1}.`"
 
     lines = [
-        f"{medals[i]} **{name}** — {count} mention{'s' if count != 1 else ''}"
+        f"{rank_prefix(i)} **{name}** — {count} mention{'s' if count != 1 else ''}"
         for i, (name, count) in enumerate(sorted_tribes)
     ]
-    embed = discord.Embed(title="🏕️ Tribe Leaderboard", description="\n".join(lines), color=0xe67e22)
+    description = "\n".join(lines)
+
+    embed = discord.Embed(title="🏕️ Tribe Leaderboard", color=0xe67e22)
     embed.add_field(name="Messages Scanned", value=f"{len(messages):,}", inline=True)
     embed.add_field(name="Unique Tribes", value=str(len(tribe_counts)), inline=True)
     embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
 
-    await progress.edit(content=None, embed=embed)
+    if len(description) <= 4096:
+        embed.description = description
+        await progress.edit(content=None, embed=embed)
+    else:
+        # Too many tribes for an embed — send as a text file attachment
+        file_content = "\n".join(
+            f"{i + 1}. {name} — {count} mention{'s' if count != 1 else ''}"
+            for i, (name, count) in enumerate(sorted_tribes)
+        )
+        file = discord.File(
+            fp=__import__("io").BytesIO(file_content.encode()),
+            filename="tribes.txt",
+        )
+        await progress.edit(content=None, embed=embed)
+        await interaction.followup.send(
+            content=f"📄 Full tribe list ({len(sorted_tribes)} tribes):",
+            file=file,
+        )
 
 
 # ── STEAM HELPERS ─────────────────────────────────────────────────────────────
