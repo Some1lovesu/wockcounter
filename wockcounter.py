@@ -134,6 +134,10 @@ POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
 # ── KILL FEED PATTERN ─────────────────────────────────────────────────────────
 KILL_PATTERN = re.compile(r'Your Tribe killed ([^\s!.,\n]+)', re.IGNORECASE)
 
+# ── TRIBE LOG PATTERN ─────────────────────────────────────────────────────────
+# Matches: ...(Tribe of SomeName)...
+TRIBE_PATTERN = re.compile(r'\(Tribe of ([^)]+)\)', re.IGNORECASE)
+
 # ── POSITIVE REACTION ─────────────────────────────────────────────────────────
 POSITIVE_PATTERNS = re.compile(
     r'\b('
@@ -969,6 +973,50 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
     await progress.edit(content=None, embed=embed)
 
 
+# ── /tribes ───────────────────────────────────────────────────────────────────
+@bot.tree.command(name="tribes", description="Count how many times each tribe appears in this channel's log history.")
+@app_commands.describe(limit="How many messages to scan (default: 5000, max: 40000)")
+async def tribes(interaction: discord.Interaction, limit: int = 5000):
+    await interaction.response.defer(thinking=True)
+    limit = min(limit, MAX_MESSAGES)
+    channel = interaction.channel
+
+    progress = await interaction.followup.send(f"⏳ Scanning `#{channel.name}` for tribe activity... (0 messages scanned)")
+
+    try:
+        messages = await safe_history(channel, limit, progress_msg=progress)
+    except discord.Forbidden:
+        await progress.edit(content="❌ I don't have permission to read message history here.")
+        return
+    except discord.HTTPException as e:
+        await progress.edit(content=f"❌ Discord API error: {e}")
+        return
+
+    tribe_counts: dict[str, int] = {}
+    for msg in messages:
+        for match in TRIBE_PATTERN.finditer(msg.content):
+            name = match.group(1).strip()
+            tribe_counts[name] = tribe_counts.get(name, 0) + 1
+
+    if not tribe_counts:
+        await progress.edit(content="📭 No tribe log messages found in the scanned history.")
+        return
+
+    sorted_tribes = sorted(tribe_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    medals = ["🥇", "🥈", "🥉"] + ["🏴‍☠️"] * 7
+
+    lines = [
+        f"{medals[i]} **{name}** — {count} mention{'s' if count != 1 else ''}"
+        for i, (name, count) in enumerate(sorted_tribes)
+    ]
+    embed = discord.Embed(title="🏕️ Tribe Leaderboard", description="\n".join(lines), color=0xe67e22)
+    embed.add_field(name="Messages Scanned", value=f"{len(messages):,}", inline=True)
+    embed.add_field(name="Unique Tribes", value=str(len(tribe_counts)), inline=True)
+    embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
+
+    await progress.edit(content=None, embed=embed)
+
+
 # ── STEAM HELPERS ─────────────────────────────────────────────────────────────
 async def steam_search(query: str, session: aiohttp.ClientSession) -> dict | None:
     """Search the Steam store and return the top result as {appid, name, icon_url}."""
@@ -1170,6 +1218,7 @@ async def help_command(interaction: discord.Interaction):
     embed.add_field(name="📊 Community", value=(
         "`/poll <question> <opt1> <opt2> [opt3] [opt4]` — Create a poll\n"
         "`/killers [limit]` — Kill feed leaderboard\n"
+        "`/tribes [limit]` — Tribe mention leaderboard\n"
         "`/count <phrase> [limit]` — Count phrase occurrences\n"
         "`/remindme <time> <message>` — Set a reminder\n"
         "`/afk [reason]` — Set your AFK status"
