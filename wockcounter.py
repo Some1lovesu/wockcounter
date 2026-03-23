@@ -135,8 +135,9 @@ POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
 KILL_PATTERN = re.compile(r'Your Tribe killed ([^\s!.,\n]+)', re.IGNORECASE)
 
 # ── TRIBE LOG PATTERN ─────────────────────────────────────────────────────────
-# Matches: ...(Tribe of SomeName)...
-TRIBE_PATTERN = re.compile(r'\(Tribe of ([^)]+)\)', re.IGNORECASE)
+# Matches the last (...) before the closing ' in an ARK structure log line.
+# Covers both "(Tribe of Name)'" and "(tribename)'" formats.
+TRIBE_PATTERN = re.compile(r"\(([^)]+)\)'", re.IGNORECASE)
 
 # ── POSITIVE REACTION ─────────────────────────────────────────────────────────
 POSITIVE_PATTERNS = re.compile(
@@ -996,6 +997,9 @@ async def tribes(interaction: discord.Interaction, limit: int = 5000):
     for msg in messages:
         for match in TRIBE_PATTERN.finditer(msg.content):
             name = match.group(1).strip()
+            # Normalise "Tribe of X" → "X"
+            if name.lower().startswith("tribe of "):
+                name = name[9:]
             tribe_counts[name] = tribe_counts.get(name, 0) + 1
 
     if not tribe_counts:
