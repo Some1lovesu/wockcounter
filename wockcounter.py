@@ -139,6 +139,22 @@ KILL_PATTERN = re.compile(r'Your Tribe killed ([^\s!.,\n]+)', re.IGNORECASE)
 # Covers both "(Tribe of Name)'" and "(tribename)'" formats.
 TRIBE_PATTERN = re.compile(r"\(([^)]+)\)'", re.IGNORECASE)
 
+# ── DINO NAME FILTER ──────────────────────────────────────────────────────────
+def _load_dino_names() -> set[str]:
+    path = os.path.join(os.path.dirname(__file__), "dino_names.txt")
+    names: set[str] = set()
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    names.add(line.lower())
+    except FileNotFoundError:
+        pass
+    return names
+
+DINO_NAMES: set[str] = _load_dino_names()
+
 # ── POSITIVE REACTION ─────────────────────────────────────────────────────────
 POSITIVE_PATTERNS = re.compile(
     r'\b('
@@ -1000,7 +1016,8 @@ async def tribes(interaction: discord.Interaction, limit: int = MAX_MESSAGES):
             # Normalise "Tribe of X" → "X"
             if name.lower().startswith("tribe of "):
                 name = name[9:]
-            tribe_counts[name] = tribe_counts.get(name, 0) + 1
+            if name.lower() not in DINO_NAMES:
+                tribe_counts[name] = tribe_counts.get(name, 0) + 1
 
     if not tribe_counts:
         await progress.edit(content="📭 No tribe log messages found in the scanned history.")
