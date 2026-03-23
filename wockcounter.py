@@ -934,8 +934,8 @@ async def afk(interaction: discord.Interaction, reason: str = None):
 
 # ── /killers ──────────────────────────────────────────────────────────────────
 @bot.tree.command(name="killers", description="Show a leaderboard of who has killed the most in this channel's history.")
-@app_commands.describe(limit="How many messages to scan (default: 5000, max: 40000)")
-async def killers(interaction: discord.Interaction, limit: int = 5000):
+@app_commands.describe(limit="How many messages to scan (default: 40000, max: 40000)")
+async def killers(interaction: discord.Interaction, limit: int = MAX_MESSAGES):
     await interaction.response.defer(thinking=True)
     limit = min(limit, MAX_MESSAGES)
     channel = interaction.channel
@@ -976,8 +976,8 @@ async def killers(interaction: discord.Interaction, limit: int = 5000):
 
 # ── /tribes ───────────────────────────────────────────────────────────────────
 @bot.tree.command(name="tribes", description="Count how many times each tribe appears in this channel's log history.")
-@app_commands.describe(limit="How many messages to scan (default: 5000, max: 40000)")
-async def tribes(interaction: discord.Interaction, limit: int = 5000):
+@app_commands.describe(limit="How many messages to scan (default: 40000, max: 40000)")
+async def tribes(interaction: discord.Interaction, limit: int = MAX_MESSAGES):
     await interaction.response.defer(thinking=True)
     limit = min(limit, MAX_MESSAGES)
     channel = interaction.channel
