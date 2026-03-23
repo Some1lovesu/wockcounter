@@ -1,0 +1,217 @@
+# ARK creature names — one per line, case-insensitive filter for /tribes
+# Lines starting with # are comments. Add custom names as needed.
+
+Achatina
+Allosaurus
+Ammonite
+Angler
+Ankylosaurus
+Araneo
+Archaeopteryx
+Argentavis
+Arthropluera
+Astrocetus
+Astrodelphis
+Basilisk
+Basilosaurus
+Baryonyx
+Beelzebufo
+Bloodstalker
+Brontosaurus
+Carbonemys
+Carnotaurus
+Castoroides
+Chalicotherium
+Cnidaria
+Coelacanth
+Compy
+Compsognathus
+Daeodon
+Deinonychus
+Dilophosaur
+Dilophosaurus
+Dimetrodon
+Dimorphodon
+Diplodocus
+Direbear
+Dire Bear
+Direwolf
+Dire Wolf
+Dodo
+Doedicurus
+Dung Beetle
+Electrophorus
+Enforcer
+Equus
+Featherlight
+Ferox
+Gacha
+Gasbags
+Giant Bee
+Gigantopithecus
+Giganotosaurus
+Giga
+Glowbug
+Glowtail
+Griffin
+Hesperornis
+Hyaenodon
+Ichthyornis
+Ichthyosaurus
+Iguanodon
+Jerboa
+Kaprosuchus
+Karkinos
+Kentrosaurus
+Leedsichthys
+Liopleurodon
+Lymantria
+Magmasaur
+Mammoth
+Managarmr
+Manta
+Mantis
+Megalania
+Megaloceros
+Megalodon
+Megatherium
+Microraptor
+Morellatops
+Mosasaurus
+Moschops
+Nameless
+Onyc
+Ovis
+Pachycephalosaurus
+Pachy
+Pachyrhinosaurus
+Paraceratherium
+Parasaur
+Parasaurolophus
+Pegomastax
+Pelagornis
+Phoenix
+Phiomia
+Plesiosaur
+Procoptodon
+Pteranodon
+Pulmonoscorpius
+Purlovia
+Quetzal
+Quetzalcoatlus
+Raptor
+Ravager
+Reaper
+Rex
+Rhyniognatha
+Rock Drake
+Rock Elemental
+Roll Rat
+Sabertooth
+Saber
+Sarco
+Sarcosuchus
+Shadowmane
+Snow Owl
+Spinosaurus
+Spino
+Stegosaurus
+Tapejara
+Terror Bird
+Therizinosaur
+Therizinosaurus
+Theri
+Thylacoleo
+Titanoboa
+Titanosaur
+Triceratops
+Trike
+Tropeognathus
+Tusoteuthis
+Unicorn
+Velonasaur
+Velo
+Wyvern
+Fire Wyvern
+Ice Wyvern
+Lightning Wyvern
+Poison Wyvern
+Crystal Wyvern
+Blood Crystal Wyvern
+Ember Crystal Wyvern
+Tropical Crystal Wyvern
+Zombie Wyvern
+Zombie Fire Wyvern
+Forest Wyvern
+X-Allosaurus
+X-Ankylosaurus
+X-Argentavis
+X-Baryonyx
+X-Brontosaurus
+X-Carnotaurus
+X-Diplodocus
+X-Giganotosaurus
+X-Mosasaurus
+X-Pteranodon
+X-Raptor
+X-Rex
+X-Spino
+X-Triceratops
+R-Allosaurus
+R-Ankylosaurus
+R-Argentavis
+R-Baryonyx
+R-Brontosaurus
+R-Carnotaurus
+R-Diplodocus
+R-Giganotosaurus
+R-Parasaur
+R-Pteranodon
+R-Raptor
+R-Rex
+R-Spino
+R-Triceratops
+Corrupted Rex
+Corrupted Raptor
+Corrupted Wyvern
+Corrupted Giganotosaurus
+Corrupted Reaper
+Corrupted Spino
+Corrupted Carnotaurus
+Corrupted Stegosaurus
+Aberrant Ankylosaurus
+Aberrant Baryonyx
+Aberrant Cnidaria
+Aberrant Dimorphodon
+Aberrant Doedicurus
+Aberrant Equus
+Aberrant Iguanodon
+Aberrant Megalania
+Aberrant Megalosaurus
+Aberrant Ovis
+Aberrant Paraceratherium
+Aberrant Parasaur
+Aberrant Raptor
+Aberrant Sarco
+Aberrant Spino
+Aberrant Stegosaurus
+Aberrant Triceratops
+Megalosaurus
+Bog Spider
+Ferox Large
+Ferox Small
+Maewing
+Noglin
+Stryder
+Shadowmane
+Amargasaurus
+Andrewsarchus
+Desmodus
+Fjordhawk
+Sinomacrops
+Liopleurodon
+Carcharodontosaurus
+Carchar
+Fasolasuchus
+Ceratosaurus
+Shastasaurus
