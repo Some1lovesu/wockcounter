@@ -139,6 +139,10 @@ KILL_PATTERN = re.compile(r'Your Tribe killed ([^\s!.,\n]+)', re.IGNORECASE)
 # Covers both "(Tribe of Name)'" and "(tribename)'" formats.
 TRIBE_PATTERN = re.compile(r"\(([^)]+)\)'", re.IGNORECASE)
 
+# Matches the structure name from "destroyed their '<Name> (..." log lines.
+# Captures everything between the opening ' and the first (, trimmed.
+STRUCTURE_PATTERN = re.compile(r"destroyed their '([^(]+?)\s*\(", re.IGNORECASE)
+
 # ── DINO NAME FILTER ──────────────────────────────────────────────────────────
 def _load_dino_names() -> set[str]:
     path = os.path.join(os.path.dirname(__file__), "dino_names.txt")
@@ -1056,6 +1060,75 @@ async def tribes(interaction: discord.Interaction, limit: int = MAX_MESSAGES):
         await progress.edit(content=None, embed=embed)
         await interaction.followup.send(
             content=f"📄 Full tribe list ({len(sorted_tribes)} tribes):",
+            file=file,
+        )
+
+
+
+# ── /structures ───────────────────────────────────────────────────────────────
+@bot.tree.command(name="structures", description="Show which structures we have destroyed and how many of each.")
+@app_commands.describe(limit="How many messages to scan (default: 40000, max: 40000)")
+async def structures(interaction: discord.Interaction, limit: int = MAX_MESSAGES):
+    await interaction.response.defer(thinking=True)
+    limit = min(limit, MAX_MESSAGES)
+    channel = interaction.channel
+
+    progress = await interaction.followup.send(f"⏳ Scanning `#{channel.name}` for destroyed structures... (0 messages scanned)")
+
+    try:
+        messages = await safe_history(channel, limit, progress_msg=progress)
+    except discord.Forbidden:
+        await progress.edit(content="❌ I don't have permission to read message history here.")
+        return
+    except discord.HTTPException as e:
+        await progress.edit(content=f"❌ Discord API error: {e}")
+        return
+
+    structure_counts: dict[str, int] = {}
+    for msg in messages:
+        m = STRUCTURE_PATTERN.search(msg.content)
+        if m:
+            name = m.group(1).strip()
+            structure_counts[name] = structure_counts.get(name, 0) + 1
+
+    if not structure_counts:
+        await progress.edit(content="📭 No structure destruction logs found in the scanned history.")
+        return
+
+    sorted_structures = sorted(structure_counts.items(), key=lambda x: x[1], reverse=True)
+    total = sum(structure_counts.values())
+    medals = ["🥇", "🥈", "🥉"]
+
+    def rank_prefix(i: int) -> str:
+        return medals[i] if i < len(medals) else f"`{i + 1}.`"
+
+    lines = [
+        f"{rank_prefix(i)} **{name}** — {count:,} destroyed"
+        for i, (name, count) in enumerate(sorted_structures)
+    ]
+    description = "\n".join(lines)
+
+    embed = discord.Embed(title="💥 Structures Destroyed", color=0xff4500)
+    embed.add_field(name="Messages Scanned", value=f"{len(messages):,}", inline=True)
+    embed.add_field(name="Total Structures", value=f"{total:,}", inline=True)
+    embed.add_field(name="Unique Types", value=str(len(structure_counts)), inline=True)
+    embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
+
+    if len(description) <= 4096:
+        embed.description = description
+        await progress.edit(content=None, embed=embed)
+    else:
+        file_content = "\n".join(
+            f"{i + 1}. {name} — {count:,} destroyed"
+            for i, (name, count) in enumerate(sorted_structures)
+        )
+        file = discord.File(
+            fp=__import__("io").BytesIO(file_content.encode()),
+            filename="structures.txt",
+        )
+        await progress.edit(content=None, embed=embed)
+        await interaction.followup.send(
+            content=f"📄 Full structure list ({len(sorted_structures)} types):",
             file=file,
         )
 
