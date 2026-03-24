@@ -467,10 +467,22 @@ async def safe_history(channel, limit, progress_msg=None):
                     retry_after = float(e.response.headers.get("Retry-After", 5))
                     print(f"⚠️  Rate limited — waiting {retry_after}s...")
                     if progress_msg:
-                        await progress_msg.edit(content=f"⏳ Rate limited by Discord — waiting {retry_after:.0f}s then resuming... ({len(messages):,} messages scanned so far)")
+                        try:
+                            await progress_msg.edit(content=f"⏳ Rate limited by Discord — waiting {retry_after:.0f}s then resuming... ({len(messages):,} messages scanned so far)")
+                        except Exception:
+                            pass
                     await asyncio.sleep(retry_after + 1)
                 else:
                     raise
+            except (discord.ConnectionClosed, aiohttp.ClientError, asyncio.TimeoutError) as e:
+                wait = 2 ** attempt
+                print(f"⚠️  Connection error ({e}), retrying in {wait}s (attempt {attempt + 1}/5)...")
+                if progress_msg:
+                    try:
+                        await progress_msg.edit(content=f"⏳ Connection hiccup — retrying in {wait}s... ({len(messages):,} messages scanned so far)")
+                    except Exception:
+                        pass
+                await asyncio.sleep(wait)
         else:
             print("❌ Gave up after 5 retries.")
             break
@@ -483,7 +495,10 @@ async def safe_history(channel, limit, progress_msg=None):
         remaining -= len(batch)
 
         if progress_msg and len(messages) % PROGRESS_EVERY < BATCH_SIZE:
-            await progress_msg.edit(content=f"⏳ Scanning... **{len(messages):,}** messages scanned so far (target: {limit:,})")
+            try:
+                await progress_msg.edit(content=f"⏳ Scanning... **{len(messages):,}** messages scanned so far (target: {limit:,})")
+            except Exception:
+                pass  # interaction token expired or bot briefly disconnected — scan continues
 
         await asyncio.sleep(BATCH_DELAY)
 
@@ -1355,4 +1370,4 @@ async def help_command(interaction: discord.Interaction):
 
 
 # ── RUN ───────────────────────────────────────────────────────────────────────
-bot.run(BOT_TOKEN)
+bot.run(BOT_TOKEN, reconnect=True)
