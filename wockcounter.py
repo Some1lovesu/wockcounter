@@ -1086,8 +1086,7 @@ async def structures(interaction: discord.Interaction, limit: int = MAX_MESSAGES
 
     structure_counts: dict[str, int] = {}
     for msg in messages:
-        m = STRUCTURE_PATTERN.search(msg.content)
-        if m:
+        for m in STRUCTURE_PATTERN.finditer(msg.content):
             name = m.group(1).strip()
             structure_counts[name] = structure_counts.get(name, 0) + 1
 
