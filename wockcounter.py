@@ -17,6 +17,12 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 GUILD_ID = 1225611222074921091
 # Channel where new base entries are broadcast.
 BASE_CHANNEL_ID: int = 1472237058503348315
+# Channel the bot watches for enemy structure-destruction logs.
+DAMAGE_LOG_CHANNEL_ID: int = 1410885326553219103
+# Channel where the live "current targets" list is posted/updated.
+TARGETS_CHANNEL_ID: int = 1472237058503348315
+ENEMY_DAMAGE_WINDOW: int = 2 * 3600   # 2-hour rolling window (seconds)
+ENEMY_DAMAGE_THRESHOLD: int = 10      # destructions required to flag a tribe
 
 MAX_MESSAGES = 40_000   # Maximum messages to scan
 BATCH_SIZE = 100         # Discord's max per request
@@ -133,6 +139,10 @@ POLL_EMOJIS = ["🇦", "🇧", "🇨", "🇩"]
 
 # ── KILL FEED PATTERN ─────────────────────────────────────────────────────────
 KILL_PATTERN = re.compile(r'Your Tribe killed ([^\s!.,\n]+)', re.IGNORECASE)
+
+# ── ENEMY DAMAGE PATTERN ──────────────────────────────────────────────────────
+# Matches "(Tribe of Gix) destroyed your" — captures the tribe name.
+ENEMY_DAMAGE_PATTERN = re.compile(r'\(([^)]+)\)\s+destroyed your', re.IGNORECASE)
 
 # ── TRIBE LOG PATTERN ─────────────────────────────────────────────────────────
 # Matches the last (...) before the closing ' in an ARK structure log line.
@@ -505,7 +515,79 @@ async def safe_history(channel, limit, progress_msg=None):
     return messages
 
 
+# ── ENEMY DAMAGE TRACKER STATE ───────────────────────────────────────────────
+# {tribe_name: [unix_timestamp, ...]} — rolling 2-hour window per tribe
+enemy_damage_log: dict[str, list[float]] = {}
+_targets_message_id: int | None = None
+
+
+def _prune_damage_log() -> None:
+    """Drop timestamps older than ENEMY_DAMAGE_WINDOW from every tribe entry."""
+    cutoff = time.time() - ENEMY_DAMAGE_WINDOW
+    for tribe in list(enemy_damage_log.keys()):
+        enemy_damage_log[tribe] = [t for t in enemy_damage_log[tribe] if t >= cutoff]
+        if not enemy_damage_log[tribe]:
+            del enemy_damage_log[tribe]
+
+
+def _get_current_targets() -> list[tuple[str, int]]:
+    """Return (tribe, count) pairs at or above threshold, sorted by count desc."""
+    _prune_damage_log()
+    return sorted(
+        [(t, len(ts)) for t, ts in enemy_damage_log.items() if len(ts) >= ENEMY_DAMAGE_THRESHOLD],
+        key=lambda x: x[1],
+        reverse=True,
+    )
+
+
+async def _update_targets_channel() -> None:
+    """Post or edit the current-targets embed in TARGETS_CHANNEL_ID."""
+    global _targets_message_id
+    targets = _get_current_targets()
+
+    channel = bot.get_channel(TARGETS_CHANNEL_ID) or await bot.fetch_channel(TARGETS_CHANNEL_ID)
+
+    if not targets:
+        embed = discord.Embed(
+            title="🎯 Current Targets",
+            description="No active threats in the last 2 hours.",
+            color=0x2ecc71,
+        )
+    else:
+        lines = [
+            f"**{i + 1}. {tribe}** — {count} structure{'s' if count != 1 else ''} destroyed"
+            for i, (tribe, count) in enumerate(targets)
+        ]
+        embed = discord.Embed(
+            title="🎯 Current Targets",
+            description="\n".join(lines),
+            color=0xff0000,
+        )
+    embed.set_footer(text=f"Tribes with {ENEMY_DAMAGE_THRESHOLD}+ destructions in the last 2 hours • auto-updated")
+    embed.timestamp = discord.utils.utcnow()
+
+    if _targets_message_id:
+        try:
+            msg = await channel.fetch_message(_targets_message_id)
+            await msg.edit(embed=embed)
+            return
+        except discord.NotFound:
+            _targets_message_id = None
+
+    msg = await channel.send(embed=embed)
+    _targets_message_id = msg.id
+
+
 # ── BACKGROUND TASK: REMINDER CHECKER ────────────────────────────────────────
+@tasks.loop(minutes=10)
+async def refresh_targets():
+    """Periodically prune expired entries and refresh the targets embed."""
+    try:
+        await _update_targets_channel()
+    except Exception as e:
+        print(f"❌ refresh_targets error: {e}")
+
+
 @tasks.loop(seconds=15)
 async def check_reminders():
     now = time.time()
@@ -529,6 +611,7 @@ async def on_ready():
     global START_TIME
     START_TIME = time.time()
     check_reminders.start()
+    refresh_targets.start()
     print(f"✅ WockCounter is online as {bot.user}")
     try:
         guild = discord.Object(id=GUILD_ID)
@@ -598,6 +681,20 @@ async def on_message(message: discord.Message):
             await message.reply(reply, mention_author=False)
             await bot.process_commands(message)
             return
+
+    # Enemy damage tracker — watch the designated log channel
+    if message.channel.id == DAMAGE_LOG_CHANNEL_ID:
+        now = time.time()
+        changed = False
+        for m in ENEMY_DAMAGE_PATTERN.finditer(message.content):
+            tribe = m.group(1).strip()
+            enemy_damage_log.setdefault(tribe, []).append(now)
+            changed = True
+        if changed:
+            try:
+                await _update_targets_channel()
+            except Exception as e:
+                print(f"❌ Failed to update targets channel: {e}")
 
     # Kill feed listener
     match = KILL_PATTERN.search(message.content)
@@ -1358,6 +1455,11 @@ async def help_command(interaction: discord.Interaction):
         "`/addbase <label> <coords> [image]` — Log a base\n"
         "`/bases` — List tracked bases\n"
         "`/removebase <id>` — Remove a base *(Manage Messages)*"
+    ), inline=False)
+
+    embed.add_field(name="⚔️ Enemy Tracker", value=(
+        "Automatically monitors the damage log channel and flags any tribe that destroys **10+ structures within 2 hours** as a current target.\n"
+        "The live target list is kept updated in the targets channel."
     ), inline=False)
 
     embed.add_field(name="🛡️ Moderation", value=(
