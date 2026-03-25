@@ -729,6 +729,36 @@ async def on_message(message: discord.Message):
 #  SLASH COMMANDS
 # ════════════════════════════════════════════════════════════════════════════
 
+# ── /testenemy ────────────────────────────────────────────────────────────────
+@bot.tree.command(name="testenemy", description="[DEV] Inject fake enemy hits to test the targets list.")
+@app_commands.describe(
+    tribe="Tribe name to inject hits for (e.g. 'ogaabooga' or 'Tribe of Gix')",
+    hits="Number of hits to inject (default: 15)",
+)
+async def testenemy(interaction: discord.Interaction, tribe: str, hits: int = 15):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Only admins can use this command.", ephemeral=True)
+        return
+    now = time.time()
+    enemy_damage_log.setdefault(tribe, []).extend([now] * hits)
+    await _update_targets_channel()
+    await interaction.response.send_message(
+        f"Injected **{hits}** hit{'s' if hits != 1 else ''} for **{tribe}**. Check the targets channel.",
+        ephemeral=True,
+    )
+
+
+# ── /clearenemy ───────────────────────────────────────────────────────────────
+@bot.tree.command(name="clearenemy", description="[DEV] Clear all enemy damage log entries.")
+async def clearenemy(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("Only admins can use this command.", ephemeral=True)
+        return
+    enemy_damage_log.clear()
+    await _update_targets_channel()
+    await interaction.response.send_message("Enemy damage log cleared.", ephemeral=True)
+
+
 # ── /count ───────────────────────────────────────────────────────────────────
 @bot.tree.command(name="count", description="Count how many times a word or phrase appears in this channel.")
 @app_commands.describe(
