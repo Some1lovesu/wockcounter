@@ -687,8 +687,7 @@ async def on_message(message: discord.Message):
         now = time.time()
         changed = False
         for m in ENEMY_DAMAGE_PATTERN.finditer(message.content):
-            raw = m.group(1).strip()
-            tribe = raw[9:].strip() if raw.lower().startswith("tribe of ") else raw
+            tribe = m.group(1).strip()
             enemy_damage_log.setdefault(tribe, []).append(now)
             changed = True
         if changed:
