@@ -111,6 +111,25 @@ WOCK_ADS = [
     "{mention} one sip of **Wock** and your tames will never die again. Probably. NEW PACK 🚬",
 ]
 
+# ── ASG LOGO ──────────────────────────────────────────────────────────────────
+ASG_LOGO = (
+    "```\n"
+    "╔═══════════════════════════════════════╗\n"
+    "║                                       ║\n"
+    "║     █████╗ ███████╗ ██████╗            ║\n"
+    "║   ██╔══██╗██╔════╝██╔════╝            ║\n"
+    "║   ███████║███████╗██║  ███╗           ║\n"
+    "║   ██╔══██║╚════██║██║   ██║           ║\n"
+    "║   ██║  ██║███████║╚██████╔╝           ║\n"
+    "║   ╚═╝  ╚═╝╚══════╝ ╚═════╝            ║\n"
+    "║                                       ║\n"
+    "║   Average Sized Guys                  ║\n"
+    "║   [ ARK: Survival Ascended // PVP ]   ║\n"
+    "║                                       ║\n"
+    "╚═══════════════════════════════════════╝\n"
+    "```"
+)
+
 # ── 8-BALL RESPONSES ──────────────────────────────────────────────────────────
 EIGHTBALL_RESPONSES = [
     ("It is certain.", True),
@@ -561,7 +580,7 @@ def _build_targets_embed(targets: list[tuple[str, int]]) -> discord.Embed:
     if not targets:
         embed = discord.Embed(
             title="🎯  Enemy Threat Board",
-            description="```\nNo active threats in the last 2 hours.\n```",
+            description=ASG_LOGO + "\n```\nNo active threats in the last 2 hours.\n```",
             color=0x2ecc71,
         )
         embed.set_footer(text=f"Threshold: {ENEMY_DAMAGE_THRESHOLD}+ destructions within 2 hrs  •  auto-updated")
@@ -578,7 +597,7 @@ def _build_targets_embed(targets: list[tuple[str, int]]) -> discord.Embed:
 
     embed = discord.Embed(
         title="🎯  Enemy Threat Board",
-        description="\n\n".join(lines),
+        description=ASG_LOGO + "\n\n" + "\n\n".join(lines),
         color=0xe74c3c,
     )
     embed.set_footer(text=f"Threshold: {ENEMY_DAMAGE_THRESHOLD}+ destructions within 2 hrs  •  auto-updated")
@@ -1172,7 +1191,7 @@ async def killers(interaction: discord.Interaction, limit: int = MAX_MESSAGES):
     medals = ["🥇", "🥈", "🥉"] + ["💀"] * 7
 
     lines = [f"{medals[i]} **{name}** — {count} kill{'s' if count != 1 else ''}" for i, (name, count) in enumerate(sorted_kills)]
-    embed = discord.Embed(title="💀 Kill Leaderboard", description="\n".join(lines), color=0xff4500)
+    embed = discord.Embed(title="💀 Kill Leaderboard", description=ASG_LOGO + "\n" + "\n".join(lines), color=0xff4500)
     embed.add_field(name="Messages Scanned", value=f"{len(messages):,}", inline=True)
     embed.add_field(name="Unique Players Killed", value=str(len(kill_counts)), inline=True)
     embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
@@ -1231,7 +1250,7 @@ async def tribes(interaction: discord.Interaction, limit: int = MAX_MESSAGES):
     embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
 
     if len(description) <= 4096:
-        embed.description = description
+        embed.description = description + "\n" + ASG_LOGO
         await progress.edit(content=None, embed=embed)
     else:
         # Too many tribes for an embed — send as a text file attachment
@@ -1300,7 +1319,7 @@ async def structures(interaction: discord.Interaction, limit: int = MAX_MESSAGES
     embed.set_footer(text=f"Requested by {interaction.user.display_name} • WockCounter")
 
     if len(description) <= 4096:
-        embed.description = description
+        embed.description = description + "\n" + ASG_LOGO
         await progress.edit(content=None, embed=embed)
     else:
         file_content = "\n".join(
@@ -1477,7 +1496,7 @@ async def bases_list(interaction: discord.Interaction):
 
     # Show the 10 most recently added bases
     recent = entries[-10:][::-1]
-    embed = discord.Embed(title="🎯 Tracked Bases", color=0xff4500)
+    embed = discord.Embed(title="🎯 Tracked Bases", description=ASG_LOGO, color=0xff4500)
     for b in recent:
         image_note = " 📷" if b.get("image_url") else ""
         map_note = f" • {b['map']}" if b.get("map") else ""
