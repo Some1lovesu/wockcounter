@@ -519,6 +519,19 @@ async def safe_history(channel, limit, progress_msg=None):
 # {tribe_name: [unix_timestamp, ...]} — rolling 2-hour window per tribe
 enemy_damage_log: dict[str, list[float]] = {}
 _targets_message_id: int | None = None
+_TARGETS_STATE_FILE = "targets_state.json"
+
+
+def _load_targets_message_id() -> int | None:
+    if os.path.exists(_TARGETS_STATE_FILE):
+        with open(_TARGETS_STATE_FILE) as f:
+            return json.load(f).get("message_id")
+    return None
+
+
+def _save_targets_message_id(mid: int) -> None:
+    with open(_TARGETS_STATE_FILE, "w") as f:
+        json.dump({"message_id": mid}, f)
 
 
 def _prune_damage_log() -> None:
@@ -540,31 +553,46 @@ def _get_current_targets() -> list[tuple[str, int]]:
     )
 
 
-async def _update_targets_channel() -> None:
-    """Post or edit the current-targets embed in TARGETS_CHANNEL_ID."""
-    global _targets_message_id
-    targets = _get_current_targets()
-
-    channel = bot.get_channel(TARGETS_CHANNEL_ID) or await bot.fetch_channel(TARGETS_CHANNEL_ID)
+def _build_targets_embed(targets: list[tuple[str, int]]) -> discord.Embed:
+    """Build the targets embed. Shared between update and startup."""
+    RANK_ICONS = ["🥇", "🥈", "🥉"]
+    THREAT_BAR_LEN = 10
 
     if not targets:
         embed = discord.Embed(
-            title="🎯 Current Targets",
-            description="No active threats in the last 2 hours.",
+            title="🎯  Enemy Threat Board",
+            description="```\nNo active threats in the last 2 hours.\n```",
             color=0x2ecc71,
         )
-    else:
-        lines = [
-            f"**{i + 1}. {tribe}** — {count} structure{'s' if count != 1 else ''} destroyed"
-            for i, (tribe, count) in enumerate(targets)
-        ]
-        embed = discord.Embed(
-            title="🎯 Current Targets",
-            description="\n".join(lines),
-            color=0xff0000,
-        )
-    embed.set_footer(text=f"Tribes with {ENEMY_DAMAGE_THRESHOLD}+ destructions in the last 2 hours • auto-updated")
+        embed.set_footer(text=f"Threshold: {ENEMY_DAMAGE_THRESHOLD}+ destructions within 2 hrs  •  auto-updated")
+        embed.timestamp = discord.utils.utcnow()
+        return embed
+
+    max_count = targets[0][1]
+    lines = []
+    for i, (tribe, count) in enumerate(targets):
+        icon = RANK_ICONS[i] if i < len(RANK_ICONS) else f"`#{i + 1}`"
+        filled = round((count / max_count) * THREAT_BAR_LEN)
+        bar = "█" * filled + "░" * (THREAT_BAR_LEN - filled)
+        lines.append(f"{icon}  **{tribe}**\n`{bar}`  {count} structure{'s' if count != 1 else ''} destroyed")
+
+    embed = discord.Embed(
+        title="🎯  Enemy Threat Board",
+        description="\n\n".join(lines),
+        color=0xe74c3c,
+    )
+    embed.set_footer(text=f"Threshold: {ENEMY_DAMAGE_THRESHOLD}+ destructions within 2 hrs  •  auto-updated")
     embed.timestamp = discord.utils.utcnow()
+    return embed
+
+
+async def _update_targets_channel() -> None:
+    """Edit the single pinned targets message; post one if it doesn't exist yet."""
+    global _targets_message_id
+    targets = _get_current_targets()
+    embed = _build_targets_embed(targets)
+
+    channel = bot.get_channel(TARGETS_CHANNEL_ID) or await bot.fetch_channel(TARGETS_CHANNEL_ID)
 
     if _targets_message_id:
         try:
@@ -576,6 +604,7 @@ async def _update_targets_channel() -> None:
 
     msg = await channel.send(embed=embed)
     _targets_message_id = msg.id
+    _save_targets_message_id(msg.id)
 
 
 # ── BACKGROUND TASK: REMINDER CHECKER ────────────────────────────────────────
@@ -608,8 +637,23 @@ async def check_reminders():
 # ── EVENT: ON READY ───────────────────────────────────────────────────────────
 @bot.event
 async def on_ready():
-    global START_TIME
+    global START_TIME, _targets_message_id
     START_TIME = time.time()
+
+    # Recover the targets message ID so we never post a duplicate
+    _targets_message_id = _load_targets_message_id()
+    if _targets_message_id is None:
+        # Fallback: scan the channel for the last message sent by this bot
+        try:
+            channel = bot.get_channel(TARGETS_CHANNEL_ID) or await bot.fetch_channel(TARGETS_CHANNEL_ID)
+            async for msg in channel.history(limit=50):
+                if msg.author == bot.user and msg.embeds and "Threat Board" in (msg.embeds[0].title or ""):
+                    _targets_message_id = msg.id
+                    _save_targets_message_id(msg.id)
+                    break
+        except Exception as e:
+            print(f"⚠️  Could not recover targets message: {e}")
+
     check_reminders.start()
     refresh_targets.start()
     print(f"✅ WockCounter is online as {bot.user}")
