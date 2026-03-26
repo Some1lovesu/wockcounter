@@ -21,6 +21,8 @@ BASE_CHANNEL_ID: int = 1472237058503348315
 DAMAGE_LOG_CHANNEL_ID: int = 1410885326553219103
 # Channel where the live "current targets" list is posted/updated.
 TARGETS_CHANNEL_ID: int = 1472237058503348315
+# Channel where the live command list is posted/updated.
+COMMAND_LIST_CHANNEL_ID: int = 1485975031921115267
 ENEMY_DAMAGE_WINDOW: int = 2 * 3600   # 2-hour rolling window (seconds)
 ENEMY_DAMAGE_THRESHOLD: int = 10      # destructions required to flag a tribe
 
@@ -540,6 +542,9 @@ enemy_damage_log: dict[str, list[float]] = {}
 _targets_message_id: int | None = None
 _TARGETS_STATE_FILE = "targets_state.json"
 
+_command_list_message_id: int | None = None
+_COMMAND_LIST_STATE_FILE = "command_list_state.json"
+
 
 def _load_targets_message_id() -> int | None:
     if os.path.exists(_TARGETS_STATE_FILE):
@@ -550,6 +555,18 @@ def _load_targets_message_id() -> int | None:
 
 def _save_targets_message_id(mid: int) -> None:
     with open(_TARGETS_STATE_FILE, "w") as f:
+        json.dump({"message_id": mid}, f)
+
+
+def _load_command_list_message_id() -> int | None:
+    if os.path.exists(_COMMAND_LIST_STATE_FILE):
+        with open(_COMMAND_LIST_STATE_FILE) as f:
+            return json.load(f).get("message_id")
+    return None
+
+
+def _save_command_list_message_id(mid: int) -> None:
+    with open(_COMMAND_LIST_STATE_FILE, "w") as f:
         json.dump({"message_id": mid}, f)
 
 
@@ -653,10 +670,108 @@ async def check_reminders():
     pending_reminders[:] = still_pending
 
 
+# ── COMMAND LIST ──────────────────────────────────────────────────────────────
+def _build_command_list_embed() -> discord.Embed:
+    """Build the live command list embed, mirroring the /help content."""
+    embed = discord.Embed(title="📖 WockCounter Commands", description=ASG_LOGO, color=0x7289da)
+
+    embed.add_field(name="🔧 Utility", value=(
+        "`/ping` — Bot latency\n"
+        "`/uptime` — How long the bot has been online\n"
+        "`/serverinfo` — Server stats\n"
+        "`/userinfo [member]` — User profile\n"
+        "`/avatar [member]` — Full-size avatar\n"
+        "`/membercount` — Member count breakdown"
+    ), inline=False)
+
+    embed.add_field(name="🎮 Fun", value=(
+        "`/8ball <question>` — Magic 8-ball\n"
+        "`/coinflip` — Heads or tails\n"
+        "`/roll [dice]` — Roll dice (e.g. `2d6`)\n"
+        "`/rps <choice>` — Rock Paper Scissors\n"
+        "`/choose <options>` — Pick from a list\n"
+        "`/wock <player>` — Prescribe someone their Wock 🚬\n"
+        "`/ask <question>` — Chat with WockBot (or just @mention me)\n"
+        "`/ark <question>` — Ask WockBot anything about ARK: Survival Ascended 🦕\n"
+        "`/players <game>` — Live Steam player count for any game"
+    ), inline=False)
+
+    embed.add_field(name="📊 Community", value=(
+        "`/poll <question> <opt1> <opt2> [opt3] [opt4]` — Create a poll\n"
+        "`/killers [limit]` — Kill feed leaderboard\n"
+        "`/tribes [limit]` — Tribe mention leaderboard\n"
+        "`/count <phrase> [limit]` — Count phrase occurrences\n"
+        "`/structures [limit]` — Destroyed structures leaderboard\n"
+        "`/remindme <time> <message>` — Set a reminder\n"
+        "`/afk [reason]` — Set your AFK status"
+    ), inline=False)
+
+    embed.add_field(name="🎯 Base Tracker", value=(
+        "`/addbase <label> <coords> [image]` — Log a base\n"
+        "`/bases` — List tracked bases\n"
+        "`/removebase <id>` — Remove a base *(Manage Messages)*"
+    ), inline=False)
+
+    embed.add_field(name="⚔️ Enemy Tracker", value=(
+        "Automatically monitors the damage log channel and flags any tribe that destroys "
+        "**10+ structures within 2 hours** as a current target.\n"
+        "The live target list is kept updated in the targets channel."
+    ), inline=False)
+
+    embed.add_field(name="🛡️ Moderation", value=(
+        "`/purge <amount>` — Bulk delete messages *(Manage Messages)*\n"
+        "`/slowmode <seconds>` — Set slowmode *(Manage Channels)*"
+    ), inline=False)
+
+    embed.set_footer(text="WockCounter • Alphaclash  •  auto-updated on restart")
+    embed.timestamp = discord.utils.utcnow()
+    return embed
+
+
+def _command_list_embed_signature(embed: discord.Embed) -> str:
+    """Return a stable string representing the embed's content for change detection."""
+    parts = []
+    for field in embed.fields:
+        parts.append(f"{field.name}:{field.value}")
+    return "\n".join(parts)
+
+
+async def _update_command_list_channel() -> None:
+    """Post or edit the single command-list message in COMMAND_LIST_CHANNEL_ID.
+
+    On restart, only edits if the content has changed since the last post.
+    """
+    global _command_list_message_id
+    embed = _build_command_list_embed()
+
+    channel = bot.get_channel(COMMAND_LIST_CHANNEL_ID) or await bot.fetch_channel(COMMAND_LIST_CHANNEL_ID)
+
+    if _command_list_message_id:
+        try:
+            msg = await channel.fetch_message(_command_list_message_id)
+            # Compare existing embed content against the freshly built one
+            if msg.embeds:
+                existing_sig = _command_list_embed_signature(msg.embeds[0])
+                new_sig = _command_list_embed_signature(embed)
+                if existing_sig == new_sig:
+                    print("✅ Command list is up-to-date — no edit needed.")
+                    return
+            await msg.edit(embed=embed)
+            print("✅ Command list updated (edited existing message).")
+            return
+        except discord.NotFound:
+            _command_list_message_id = None
+
+    msg = await channel.send(embed=embed)
+    _command_list_message_id = msg.id
+    _save_command_list_message_id(msg.id)
+    print(f"✅ Command list posted (message ID {msg.id}).")
+
+
 # ── EVENT: ON READY ───────────────────────────────────────────────────────────
 @bot.event
 async def on_ready():
-    global START_TIME, _targets_message_id
+    global START_TIME, _targets_message_id, _command_list_message_id
     START_TIME = time.time()
 
     # Recover the targets message ID so we never post a duplicate
@@ -673,6 +788,20 @@ async def on_ready():
         except Exception as e:
             print(f"⚠️  Could not recover targets message: {e}")
 
+    # Recover the command list message ID
+    _command_list_message_id = _load_command_list_message_id()
+    if _command_list_message_id is None:
+        # Fallback: scan the channel for the last command list message sent by this bot
+        try:
+            cl_channel = bot.get_channel(COMMAND_LIST_CHANNEL_ID) or await bot.fetch_channel(COMMAND_LIST_CHANNEL_ID)
+            async for msg in cl_channel.history(limit=50):
+                if msg.author == bot.user and msg.embeds and "WockCounter Commands" in (msg.embeds[0].title or ""):
+                    _command_list_message_id = msg.id
+                    _save_command_list_message_id(msg.id)
+                    break
+        except Exception as e:
+            print(f"⚠️  Could not recover command list message: {e}")
+
     check_reminders.start()
     refresh_targets.start()
     print(f"✅ WockCounter is online as {bot.user}")
@@ -683,6 +812,12 @@ async def on_ready():
         print(f"✅ Synced {len(synced)} command(s)")
     except Exception as e:
         print(f"❌ Sync failed: {e}")
+
+    # Post or update the command list (only edits if content changed)
+    try:
+        await _update_command_list_channel()
+    except Exception as e:
+        print(f"⚠️  Could not update command list: {e}")
 
 
 # ── EVENT: ON MESSAGE ─────────────────────────────────────────────────────────
