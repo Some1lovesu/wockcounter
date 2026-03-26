@@ -673,7 +673,7 @@ async def check_reminders():
 # ── COMMAND LIST ──────────────────────────────────────────────────────────────
 def _build_command_list_embed() -> discord.Embed:
     """Build the live command list embed, mirroring the /help content."""
-    embed = discord.Embed(title="📖 WockCounter Commands", color=0x7289da)
+    embed = discord.Embed(title="📖 WockCounter Commands", description=ASG_LOGO, color=0x7289da)
 
     embed.add_field(name="🔧 Utility", value=(
         "`/ping` — Bot latency\n"
