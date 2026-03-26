@@ -1556,8 +1556,8 @@ async def players(interaction: discord.Interaction, game: str):
 
 
 # ── /inspirobot ───────────────────────────────────────────────────────────────
-@bot.tree.command(name="inspirobot", description="Get a freshly generated InspiroBot motivational image.")
-async def inspirobot(interaction: discord.Interaction):
+@bot.tree.command(name="motivateme", description="Get a freshly generated InspiroBot motivational image.")
+async def motivateme(interaction: discord.Interaction):
     await interaction.response.defer(thinking=True)
     try:
         async with aiohttp.ClientSession() as session:
