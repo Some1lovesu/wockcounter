@@ -807,9 +807,11 @@ async def on_ready():
     print(f"✅ WockCounter is online as {bot.user}")
     try:
         guild = discord.Object(id=GUILD_ID)
-        bot.tree.copy_global_to(guild=guild)
-        synced = await bot.tree.sync(guild=guild)
-        print(f"✅ Synced {len(synced)} command(s)")
+        # Sync globally so commands are registered across all servers
+        global_synced = await bot.tree.sync()
+        # Also sync to the specific guild for instant propagation
+        guild_synced = await bot.tree.sync(guild=guild)
+        print(f"✅ Synced {len(global_synced)} global command(s), {len(guild_synced)} guild command(s)")
     except Exception as e:
         print(f"❌ Sync failed: {e}")
 
