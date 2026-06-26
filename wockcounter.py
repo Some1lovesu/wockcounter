@@ -927,6 +927,106 @@ async def on_message(message: discord.Message):
 #  SLASH COMMANDS
 # ════════════════════════════════════════════════════════════════════════════
 
+# ── TRIBE SETUP TEMPLATE ─────────────────────────────────────────────────────
+# Edit this list to change what /setup-tribe creates. Each entry is:
+#   {"name": "Category Name", "type": discord.ChannelType, "category": "Category Name"}
+# Categories are created in order; channels are grouped under their category.
+TRIBE_SETUP_TEMPLATE: list[dict] = [
+    # ── 📋 INFO ──────────────────────────────────────────────────────────────
+    {"name": "📋 INFO",             "type": "category"},
+    {"name": "welcome",             "type": "text",     "category": "📋 INFO"},
+    {"name": "rules",               "type": "text",     "category": "📋 INFO"},
+    {"name": "announcements",       "type": "text",     "category": "📋 INFO"},
+    {"name": "tribe-log",           "type": "text",     "category": "📋 INFO"},
+    # ── 💬 GENERAL ───────────────────────────────────────────────────────────
+    {"name": "💬 GENERAL",          "type": "category"},
+    {"name": "general",             "type": "text",     "category": "💬 GENERAL"},
+    {"name": "memes",               "type": "text",     "category": "💬 GENERAL"},
+    {"name": "clips-and-screenshots","type": "text",    "category": "💬 GENERAL"},
+    # ── 🏗️ BASE & BUILDING ───────────────────────────────────────────────────
+    {"name": "🏗️ BASE & BUILDING",  "type": "category"},
+    {"name": "base-planning",       "type": "text",     "category": "🏗️ BASE & BUILDING"},
+    {"name": "build-requests",      "type": "text",     "category": "🏗️ BASE & BUILDING"},
+    {"name": "loot-and-resources",  "type": "text",     "category": "🏗️ BASE & BUILDING"},
+    # ── ⚔️ RAIDING & PVP ─────────────────────────────────────────────────────
+    {"name": "⚔️ RAIDING & PVP",    "type": "category"},
+    {"name": "raid-planning",       "type": "text",     "category": "⚔️ RAIDING & PVP"},
+    {"name": "enemy-intel",         "type": "text",     "category": "⚔️ RAIDING & PVP"},
+    {"name": "raid-log",            "type": "text",     "category": "⚔️ RAIDING & PVP"},
+    # ── 🦖 DINOS & TAMING ────────────────────────────────────────────────────
+    {"name": "🦖 DINOS & TAMING",   "type": "category"},
+    {"name": "taming-requests",     "type": "text",     "category": "🦖 DINOS & TAMING"},
+    {"name": "breeding",            "type": "text",     "category": "🦖 DINOS & TAMING"},
+    # ── 🎮 VOICE ─────────────────────────────────────────────────────────────
+    {"name": "🎮 VOICE",            "type": "category"},
+    {"name": "General VC",          "type": "voice",    "category": "🎮 VOICE"},
+    {"name": "Raid Squad",          "type": "voice",    "category": "🎮 VOICE"},
+    {"name": "AFK",                 "type": "voice",    "category": "🎮 VOICE"},
+]
+
+# ── /setup-tribe ─────────────────────────────────────────────────────────────
+@bot.tree.command(name="setup-tribe", description="Build out the standard ARK tribe channel layout (admin only).")
+async def setup_tribe(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message(
+            "❌ You need **Administrator** permission to run this command.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    guild = interaction.guild
+    existing_categories = {cat.name: cat for cat in guild.categories}
+    existing_channels = {ch.name: ch for ch in guild.channels}
+
+    created_categories: list[str] = []
+    created_channels: list[str] = []
+    skipped: list[str] = []
+
+    current_category: discord.CategoryChannel | None = None
+
+    for entry in TRIBE_SETUP_TEMPLATE:
+        name = entry["name"]
+        kind = entry["type"]
+
+        if kind == "category":
+            if name in existing_categories:
+                current_category = existing_categories[name]
+                skipped.append(f"[category] {name}")
+            else:
+                current_category = await guild.create_category(name)
+                existing_categories[name] = current_category
+                created_categories.append(name)
+        elif kind == "text":
+            if name in existing_channels:
+                skipped.append(f"#  {name}")
+            else:
+                await guild.create_text_channel(name, category=current_category)
+                existing_channels[name] = True
+                created_channels.append(f"# {name}")
+        elif kind == "voice":
+            if name in existing_channels:
+                skipped.append(f"🔊 {name}")
+            else:
+                await guild.create_voice_channel(name, category=current_category)
+                existing_channels[name] = True
+                created_channels.append(f"🔊 {name}")
+
+    parts: list[str] = ["✅ **Tribe setup complete!**\n"]
+
+    if created_categories:
+        parts.append(f"**Categories created ({len(created_categories)}):**\n" + "\n".join(f"  • {c}" for c in created_categories))
+    if created_channels:
+        parts.append(f"**Channels created ({len(created_channels)}):**\n" + "\n".join(f"  • {c}" for c in created_channels))
+    if skipped:
+        parts.append(f"**Skipped — already exist ({len(skipped)}):**\n" + "\n".join(f"  • {c}" for c in skipped))
+    if not created_categories and not created_channels:
+        parts.append("Nothing to create — all channels already exist.")
+
+    await interaction.followup.send("\n\n".join(parts), ephemeral=True)
+
+
 # ── /testenemy ────────────────────────────────────────────────────────────────
 @bot.tree.command(name="testenemy", description="[DEV] Inject fake enemy hits to test the targets list.")
 @app_commands.describe(
